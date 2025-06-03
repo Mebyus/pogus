@@ -208,6 +208,15 @@ unsafe_get_c_string_length(const u8* ptr) {
 	return i;
 }
 
+static c_string
+unsafe_make_c_string_from_ptr(u8* ptr) {
+	uint len = unsafe_get_c_string_length(ptr);
+	c_string s = {};
+	s.ptr = ptr;
+	s.len = len;
+	return s;
+}
+
 /*
 Copy the string {s} into buffer {buf} and place null byte at the end.
 Returns {c_string} sliced from {buf}.
@@ -693,7 +702,11 @@ init_os_proc_input(uint argc, u8** argv, u8** envp) {
 
 	os_proc_input.args = make_span_str(block.span.ptr, argc);
 	for (uint i = 0; i < argc; i += 1) {
-
+		u8* ptr = argv[i];
+		if (ptr == nil) {
+			break;
+		}
+		os_proc_input.args.ptr[i] = unsafe_make_c_string_from_ptr(ptr);
 	}
 
 	return 0;

@@ -89,10 +89,10 @@ func buildTarget(t *BuildTarget) error {
 
 	outpath := filepath.Join(dir, t.Name)
 	source := filepath.Join(sourceDir, t.RootSourceFile)
-	return compileExe(source, outpath)
+	return compileExe(source, outpath, t.Links)
 }
 
-func compileExe(source string, outpath string) error {
+func compileExe(source string, outpath string, links []string) error {
 	var args []string
 	args = append(args, codegenFlags...)
 	args = append(args, maxCompilerErrorsFlag)
@@ -103,6 +103,10 @@ func compileExe(source string, outpath string) error {
 	args = append(args, "-o", outpath)
 	// args = append(args, "-c", source)
 	args = append(args, source)
+
+	for _, link := range links {
+		args = append(args, "-l" + link)
+	}
 
 	return invokeCompiler(args)
 }
@@ -115,6 +119,8 @@ func invokeCompiler(args []string) error {
 }
 
 type BuildTarget struct {
+	Links []string
+
 	Name string
 
 	RootSourceFile string
@@ -128,9 +134,15 @@ func readBuildTargets(path string) ([]BuildTarget, error) {
 
 	var targets []BuildTarget
 	scanner := bufio.NewScanner(f)
+	var target BuildTarget // current build target
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
+			continue
+		}
+		if line == "}" {
+			targets = append(targets, target)
+			target = BuildTarget{}
 			continue
 		}
 
@@ -140,11 +152,29 @@ func readBuildTargets(path string) ([]BuildTarget, error) {
 		}
 
 		if strings.HasPrefix(line, "#build") {
-			t, err := parseBuildTarget(line)
+			name, err := parseBuildName(line)
 			if err != nil {
 				return nil, err
 			}
-			targets = append(targets, t)
+			target.Name = name
+			continue
+		}
+
+		if strings.HasPrefix(line, "#root") {
+			root, err := parseBuildRoot(line)
+			if err != nil {
+				return nil, err
+			}
+			target.RootSourceFile = root
+			continue
+		}
+
+		if strings.HasPrefix(line, "#link") {
+			link, err := parseBuildLink(line)
+			if err != nil {
+				return nil, err
+			}
+			target.Links = append(target.Links, link)
 			continue
 		}
 
@@ -158,23 +188,41 @@ func readBuildTargets(path string) ([]BuildTarget, error) {
 	return targets, nil
 }
 
-func parseBuildTarget(line string) (BuildTarget, error) {
-	s := strings.TrimPrefix(line, "#build")
-	name, src, ok := strings.Cut(s, "=")
-	if !ok {
-		return BuildTarget{}, errors.New("bad build format")
+func parseBuildName(line string) (string, error) {
+	fields := strings.Fields(line)
+	if len(fields) < 2 {
+		return "", errors.New("bad build format")
 	}
-	name = strings.TrimSpace(name)
+	name := fields[1]
 	if name == "" {
-		return BuildTarget{}, errors.New("empty build name")
-	}
-	src = strings.TrimSpace(src)
-	if src == "" {
-		return BuildTarget{}, errors.New("empty source file name")
+		return "", errors.New("empty build name")
 	}
 
-	return BuildTarget{
-		Name:           name,
-		RootSourceFile: src,
-	}, nil
+	return name, nil
+}
+
+func parseBuildRoot(line string) (string, error) {
+	fields := strings.Fields(line)
+	if len(fields) < 2 {
+		return "", errors.New("bad root format")
+	}
+	root := fields[1]
+	if root == "" {
+		return "", errors.New("empty root name")
+	}
+
+	return root, nil
+}
+
+func parseBuildLink(line string) (string, error) {
+	fields := strings.Fields(line)
+	if len(fields) < 2 {
+		return "", errors.New("bad link format")
+	}
+	link := fields[1]
+	if link == "" {
+		return "", errors.New("empty link name")
+	}
+
+	return link, nil
 }

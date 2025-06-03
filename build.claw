@@ -1,3 +1,10 @@
 #set source.dir = src
 
-#build djb2 = main_hash.c
+#build djb2 {
+    #root main_hash.c
+}
+
+#build game {
+    #root main_window.c
+    #link xcb
+}

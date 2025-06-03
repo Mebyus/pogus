@@ -10,6 +10,11 @@ uint main(uint argc, u8** argv, u8** envp) {
         return code;
     }
 
+    for (uint i = 0; i < os_proc_input.args.len; i += 1) {
+        print(os_proc_input.args.ptr[i]);
+        print(ss("\n"));
+    }
+
     print(ss("hello, world!\n"));
 
     MemBlock block;
