@@ -11,6 +11,8 @@
 Holds together platorm-specific context for running the engine.
 */
 typedef struct {
+    Logger lg;
+
     // Title of the application window.
     str title;
 
@@ -38,6 +40,8 @@ engine_harness_mark_exit(EngineHarness* h, uint code) {
 
 static void
 init_engine_harness(EngineHarness* h) {
+    init_log(&h->lg, ss("test.log"), LOG_LEVEL_INFO);
+
 	h->connection = xcb_connect(nil, nil); // Callers need to use xcb_connection_has_error() to check for failure.
     if (h->connection == nil) {
         engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);

@@ -153,6 +153,11 @@ str_slice_head(str s, uint n) {
 	return span_u8_slice_head(s, n);
 }
 
+static str
+str_slice_tail(str s, uint n) {
+	return span_u8_slice_tail(s, n);
+}
+
 /*
 Copies {n} bytes of memory from source to destination. Number of copied bytes
 must be greater than zero.
