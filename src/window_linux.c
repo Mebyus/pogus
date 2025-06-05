@@ -1,4 +1,5 @@
 #include "link_xcb.h"
+#include <link/vulkan_linux.h>
 
 // Main application window was closed.
 #define ENGINE_EXIT_CLOSE 0
@@ -6,12 +7,19 @@
 // Error during engine init phase.
 #define ENGINE_EXIT_ERROR_INIT 1
 
+typedef struct {
+    vk_Instance instance;
+    vk_SurfaceKHR surface; 
+} VulkanContext;
+
 /*/doc
 
 Holds together platorm-specific context for running the engine.
 */
 typedef struct {
     Logger lg;
+
+    VulkanContext vk;
 
     // Title of the application window.
     str title;
@@ -39,7 +47,7 @@ engine_harness_mark_exit(EngineHarness* h, uint code) {
 }
 
 static void
-init_engine_harness(EngineHarness* h) {
+engine_harness_create_window(EngineHarness* h) {
     init_log(&h->lg, ss("test.log"), LOG_LEVEL_INFO);
 
 	h->connection = xcb_connect(nil, nil); // Callers need to use xcb_connection_has_error() to check for failure.
@@ -130,6 +138,73 @@ init_engine_harness(EngineHarness* h) {
 	xcb_map_window(h->connection, h->window);
 	
 	xcb_flush(h->connection);
+}
+
+static void
+log_vulkan_error(Logger *lg, str s, vk_Result r) {
+    log_error_field(lg, s, log_field_s64(ss("vk_result"), r));
+}
+
+static void
+init_vulkan(EngineHarness* h) {
+    c_string app_name = ss("Pogus Test Game");
+    c_string engine_name = ss("Pogus Engine");
+
+    vk_ApplicationInfo app_info = {};
+    app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    app_info.apiVersion = vk_make_version(1, 4);
+    app_info.pApplicationName = app_name.ptr;
+    app_info.applicationVersion = vk_make_version(1, 0);
+    app_info.pEngineName = engine_name.ptr;
+    app_info.engineVersion = vk_make_version(1, 0);
+
+    vk_InstanceCreateInfo create_info = {};
+    create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    create_info.pApplicationInfo = &app_info;
+
+    c_string surface_extension_name = ss("VK_KHR_surface");
+    c_string xcb_surface_extension_name = ss("VK_KHR_xcb_surface");
+    const u8* extensions[] = {
+        surface_extension_name.ptr,
+        xcb_surface_extension_name.ptr,
+    };
+
+    create_info.enabledExtensionCount = 2;
+    create_info.ppEnabledExtensionNames = extensions;
+
+    // TODO: supply custom allocator
+    vk_Result r = vk_create_instance(&create_info, nil, &h->vk.instance);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("create vulkan instance"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+
+
+    vk_XcbSurfaceCreateInfoKHR surface_create_info = {};
+    surface_create_info.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
+    surface_create_info.connection = h->connection;
+    surface_create_info.window = h->window;
+
+    r = vk_create_xcb_surface_khr(h->vk.instance, &surface_create_info, nil, &h->vk.surface);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("create vulkan surface"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+}
+
+static void
+init_engine_harness(EngineHarness* h) {
+    engine_harness_create_window(h);
+    if (h->exit) {
+        return;
+    }
+
+    init_vulkan(h);
+    if (h->exit) {
+        return;
+    }
 }
 
 static void

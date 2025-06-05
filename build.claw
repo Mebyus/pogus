@@ -1,4 +1,5 @@
 #set source.dir = src
+#set link.dir = /usr/lib
 
 #build djb2 {
     #root main_hash.c
@@ -6,5 +7,7 @@
 
 #build game {
     #root main_window.c
+    
     #link xcb
+    #link vulkan
 }

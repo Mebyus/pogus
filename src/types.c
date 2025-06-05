@@ -388,6 +388,10 @@ unsafe_fmt_reverse_dec_u64(u8* ptr, u64 x) {
 	}
 }
 
+/*/doc
+
+Maximum number of bytes (digits) needed to format any u64 integer as decimal number.
+*/
 static const uint
 max_u64_dec_length = 20;
 
@@ -397,9 +401,27 @@ Same as fmt_dec_u64, but has no buffer boundary checks.
 static uint
 unsafe_fmt_dec_u64(span_u8 buf, u64 x) {
 	u8 digits[max_u64_dec_length];
-	const uint len = unsafe_fmt_reverse_dec_u64(digits, x);
-	unsafe_reverse_copy(buf.ptr, digits, len);
-	return len;
+	const uint n = unsafe_fmt_reverse_dec_u64(digits, x);
+	unsafe_reverse_copy(buf.ptr, digits, n);
+	return n;
+}
+
+/*/doc
+
+Maximum number of bytes (digits) needed to format any u64 integer as decimal number.
+*/
+static const uint
+max_s64_dec_length = max_u64_dec_length + 1;
+
+static uint
+unsafe_fmt_dec_s64(span_u8 buf, s64 x) {
+	if (x >= 0) {
+		return unsafe_fmt_dec_u64(buf, cast(u64, x));
+	}
+
+	buf.ptr[0] = '-';
+	uint n = unsafe_fmt_dec_u64(span_u8_slice_tail(buf, 1), cast(u64, -x));
+	return n + 1;
 }
 
 /*

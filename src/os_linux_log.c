@@ -18,6 +18,53 @@ typedef struct {
     u8 level;
 } Logger;
 
+#define LOG_FIELD_U64 0
+#define LOG_FIELD_S64 1
+#define LOG_FIELD_STR 2
+
+typedef union {
+    u64 u64;
+    s64 s64;
+    str str;
+} LogFieldValue;
+
+typedef struct {
+    LogFieldValue value;
+
+    str name;
+    u8  kind;
+} LogField;
+
+static LogField
+log_field_u64(str name, u64 value) {
+    LogField field = {};
+    field.value.u64 = value;
+    field.name = name;
+    field.kind = LOG_FIELD_U64;
+    return field;
+}
+
+static LogField
+log_field_s64(str name, s64 value) {
+    LogField field = {};
+    field.value.s64 = value;
+    field.name = name;
+    field.kind = LOG_FIELD_S64;
+    return field;
+}
+
+static LogField
+log_field_str(str name, str value) {
+    LogField field = {};
+    field.value.str = value;
+    field.name = name;
+    field.kind = LOG_FIELD_STR;
+    return field;
+}
+
+static str
+log_prefix_table[LOG_LEVEL_DEBUG + 1];
+
 static void
 init_log(Logger* lg, str path, u8 level) {
     u8 path_buf[OS_LINUX_MAX_PATH_LENGTH];
@@ -33,6 +80,13 @@ init_log(Logger* lg, str path, u8 level) {
     
     lg->pos = 0;
     lg->level = level;
+
+    // TODO: make prefix initialization once per program start
+    log_prefix_table[LOG_LEVEL_FATAL] = ss("[fatal] ");
+    log_prefix_table[LOG_LEVEL_ERROR] = ss("[error] ");
+    log_prefix_table[LOG_LEVEL_WARN]  = ss(" [warn] ");
+    log_prefix_table[LOG_LEVEL_INFO]  = ss(" [info] ");
+    log_prefix_table[LOG_LEVEL_DEBUG] = ss("[debug] ");
 }
 
 static bool
@@ -40,9 +94,18 @@ log_buffer_full(Logger *lg) {
     return lg->pos >= LOG_BUFFER_SIZE;
 }
 
+/*/doc
+
+Returns length (in bytes) of buffer tail (unoccupied portion).
+*/
+static uint
+log_buffer_left(Logger *lg) {
+    return LOG_BUFFER_SIZE - lg->pos;
+}
+
 static span_u8
 log_buffer_tail(Logger* lg) {
-    return make_span_u8(lg->buf + lg->pos, LOG_BUFFER_SIZE - lg->pos);
+    return make_span_u8(lg->buf + lg->pos, log_buffer_left(lg));
 }
 
 static span_u8
@@ -51,10 +114,17 @@ log_buffer_head(Logger* lg) {
 }
 
 static void
-log_flush(Logger* lg) {
-    if (lg->fd != 0) {
-        os_linux_write_all(lg->fd, log_buffer_head(lg));
+log_file_write(Logger* lg, span_u8 s) {
+    if (lg->fd == 0) {
+        return;
     }
+
+    os_linux_write_all(lg->fd, s);
+}
+
+static void
+log_flush(Logger* lg) {
+    log_file_write(lg, log_buffer_head(lg));
     lg->pos = 0;
 }
 
@@ -75,13 +145,16 @@ log_newline(Logger* lg) {
 }
 
 static void
+log_space(Logger* lg) {
+    log_put_byte(lg, ' ');
+}
+
+static void
 log_write(Logger* lg, str s) {
-    if (s.len >= LOG_BUFFER_SIZE) {
+    if (s.len >= (LOG_BUFFER_SIZE / 2)) {
         // avoid copies for large strings
         log_flush(lg);
-        if (lg->fd != 0) {
-            os_linux_write_all(lg->fd, s);
-        }
+        log_file_write(lg, s);
         return;
     }
 
@@ -99,13 +172,82 @@ log_write(Logger* lg, str s) {
 }
 
 static void
+log_write_field_value_u64(Logger* lg, u64 value) {
+    if (log_buffer_left(lg) < max_u64_dec_length) {
+        log_flush(lg);
+    }
+
+    span_u8 tail = log_buffer_tail(lg);
+    uint n = unsafe_fmt_dec_u64(tail, value);
+    lg->pos += n;
+}
+
+static void
+log_write_field_value_s64(Logger* lg, s64 value) {
+    if (log_buffer_left(lg) < max_s64_dec_length) {
+        log_flush(lg);
+    }
+
+    span_u8 tail = log_buffer_tail(lg);
+    uint n = unsafe_fmt_dec_s64(tail, value);
+    lg->pos += n;
+}
+
+static void
+log_write_field_value_str(Logger* lg, str value) {
+    log_put_byte(lg, '"');
+    log_write(lg, value);
+    log_put_byte(lg, '"');
+}
+
+static void
+log_write_field_value(Logger* lg, u8 kind, LogFieldValue value) {
+    switch (kind) {
+    case LOG_FIELD_U64:
+        log_write_field_value_u64(lg, value.u64);
+        return;
+    case LOG_FIELD_S64:
+        log_write_field_value_s64(lg, value.s64);
+        return;
+    case LOG_FIELD_STR:
+        log_write_field_value_str(lg, value.str);
+        return;
+    default:
+        panic_trap();
+    }
+}
+
+static void
+log_write_field(Logger* lg, LogField field) {
+    log_put_byte(lg, '{');
+    log_write(lg, field.name);
+    log_put_byte(lg, ':');
+    log_space(lg);
+    log_write_field_value(lg, field.kind, field.value);
+    log_put_byte(lg, '}');
+}
+
+static void
 log_message(Logger* lg, u8 level, str s) {
     if (level > lg->level) {
         return;
     }
 
-    // TODO: add prefix
+    log_write(lg, log_prefix_table[level]);
     log_write(lg, s);
+    log_newline(lg);
+}
+
+static void
+log_message_field(Logger* lg, u8 level, str s, LogField field) {
+    if (level > lg->level) {
+        return;
+    }
+
+    log_write(lg, log_prefix_table[level]);
+    log_write(lg, s);
+    log_space(lg);
+    log_write_field(lg, field);
     log_newline(lg);
 }
 
@@ -127,4 +269,9 @@ log_warn(Logger* lg, str s) {
 static void
 log_error(Logger* lg, str s) {
     log_message(lg, LOG_LEVEL_ERROR, s);
+}
+
+static void
+log_error_field(Logger* lg, str s, LogField field) {
+    log_message_field(lg, LOG_LEVEL_ERROR, s, field);
 }

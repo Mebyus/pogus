@@ -59,15 +59,16 @@ const compiler = "cc"
 const sourceDir = "src"
 
 func main() {
-	targets, err := readBuildTargets("build.claw")
+	plan, err := readBuildTargets("build.claw")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
-	for _, t := range targets {
+	fmt.Println(plan.Env)
+	for _, t := range plan.Targets {
 		fmt.Println(t)
-		err = buildTarget(&t)
+		err = buildTarget(&t, plan.Env)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "build \"%s\" target: %s\n", t.Name, err)
 			os.Exit(1)
@@ -80,7 +81,7 @@ func main() {
 	}
 }
 
-func buildTarget(t *BuildTarget) error {
+func buildTarget(t *BuildTarget, env map[string]string) error {
 	dir := filepath.Join("build", t.Name)
 	err := os.MkdirAll(dir, 0o755)
 	if err != nil {
@@ -89,10 +90,24 @@ func buildTarget(t *BuildTarget) error {
 
 	outpath := filepath.Join(dir, t.Name)
 	source := filepath.Join(sourceDir, t.RootSourceFile)
-	return compileExe(source, outpath, t.Links)
+
+	return compileExe(&CompileExeSpec{
+		SourceFile: source,
+		OutPath:    outpath,
+		Links:      t.Links,
+		LinkSearch: env["link.dir"],
+	})
 }
 
-func compileExe(source string, outpath string, links []string) error {
+type CompileExeSpec struct {
+	SourceFile string
+	OutPath    string
+	LinkSearch string
+
+	Links []string
+}
+
+func compileExe(spec *CompileExeSpec) error {
 	var args []string
 	args = append(args, codegenFlags...)
 	args = append(args, maxCompilerErrorsFlag)
@@ -100,12 +115,18 @@ func compileExe(source string, outpath string, links []string) error {
 	args = append(args, otherFlags...)
 	args = append(args, "-Og", "-ggdb")
 
-	args = append(args, "-o", outpath)
-	// args = append(args, "-c", source)
-	args = append(args, source)
+	args = append(args, "-Isrc")
 
-	for _, link := range links {
-		args = append(args, "-l" + link)
+	if spec.LinkSearch != "" {
+		args = append(args, "-L"+spec.LinkSearch)
+	}
+
+	args = append(args, "-o", spec.OutPath)
+	// args = append(args, "-c", source)
+	args = append(args, spec.SourceFile)
+
+	for _, link := range spec.Links {
+		args = append(args, "-l"+link)
 	}
 
 	return invokeCompiler(args)
@@ -118,6 +139,12 @@ func invokeCompiler(args []string) error {
 	return cmd.Run()
 }
 
+type BuildPlan struct {
+	Targets []BuildTarget
+
+	Env map[string]string
+}
+
 type BuildTarget struct {
 	Links []string
 
@@ -126,12 +153,13 @@ type BuildTarget struct {
 	RootSourceFile string
 }
 
-func readBuildTargets(path string) ([]BuildTarget, error) {
+func readBuildTargets(path string) (*BuildPlan, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 
+	env := make(map[string]string)
 	var targets []BuildTarget
 	scanner := bufio.NewScanner(f)
 	var target BuildTarget // current build target
@@ -147,7 +175,11 @@ func readBuildTargets(path string) ([]BuildTarget, error) {
 		}
 
 		if strings.HasPrefix(line, "#set") {
-			// TODO: implement setting variables
+			name, value, err := parseSetEnv(line)
+			if err != nil {
+				return nil, err
+			}
+			env[name] = value
 			continue
 		}
 
@@ -185,7 +217,10 @@ func readBuildTargets(path string) ([]BuildTarget, error) {
 		return nil, err
 	}
 
-	return targets, nil
+	return &BuildPlan{
+		Targets: targets,
+		Env:     env,
+	}, nil
 }
 
 func parseBuildName(line string) (string, error) {
@@ -225,4 +260,18 @@ func parseBuildLink(line string) (string, error) {
 	}
 
 	return link, nil
+}
+
+func parseSetEnv(line string) (name string, value string, err error) {
+	fields := strings.Fields(line)
+	if len(fields) < 4 {
+		return "", "",  errors.New("bad set format")
+	}
+	name = fields[1]
+	value = fields[3]
+
+	if name == "" {
+		return "", "", errors.New("empty env name")
+	}
+	return name, value, nil
 }

@@ -3,9 +3,16 @@
 #include "link_libc.h"
 #include "os_linux_log.c"
 #include "window_linux.c"
+#include "graphics_vulkan.c"
 
 static void
 run_main_loop(EngineHarness* h) {
+    if (h->exit) {
+        return;
+    }
+
+    log_info(&h->lg, ss("main loop enter"));
+
     uint frame = 0;
     while (!h->exit) {        
         poll_system_events(h);
