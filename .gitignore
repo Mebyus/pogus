@@ -1,8 +1,19 @@
 /build/
 
 *.o
+*.a
+*.i
+*.so
+*.dll
+*.exe
+
 /*.c
+/*.h
+
+/*.cc
+/*.cpp
+/*.hpp
 
 *.log
 
-/src/link/vulkan/
+/src/extlink/vulkan_generated/

@@ -3,7 +3,6 @@
 #include "link_libc.h"
 #include "os_linux_log.c"
 #include "window_linux.c"
-#include "graphics_vulkan.c"
 
 static void
 run_main_loop(EngineHarness* h) {
@@ -11,17 +10,29 @@ run_main_loop(EngineHarness* h) {
         return;
     }
 
-    log_info(&h->lg, ss("main loop enter"));
+    log_debug(&h->lg, ss("main loop enter"));
 
     uint frame = 0;
     while (!h->exit) {        
         poll_system_events(h);
         if (h->exit) {
-            log_info(&h->lg, ss("main loop exit"));
+            log_debug(&h->lg, ss("main loop exit"));
             return;
         }
 
         frame += 1;
+    }
+}
+
+static void
+log_exit_code(Logger* lg, uint code) {
+    str msg = ss("program exit");
+    LogField field = log_field_u64(ss("code"), code);
+
+    if (code == 0) {
+        log_info_field(lg, msg, field);
+    } else {
+        log_warn_field(lg, msg, field);
     }
 }
 
@@ -37,7 +48,9 @@ uint main(uint argc, u8** argv, u8** envp) {
 
     init_engine_harness(&h);
     run_main_loop(&h);
-    log_flush(&h.lg);
+
+    log_exit_code(&h.lg, h.exit_code);
+    log_close(&h.lg);
 
     return h.exit_code;
 }

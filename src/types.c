@@ -74,6 +74,22 @@ const s16 max_integer_s16 = 0x7FFF;
 const s32 max_integer_s32 = 0x7FFFFFFF;
 const s64 max_integer_s64 = 0x7FFFFFFFFFFFFFFF;
 
+static u32
+min_u32(u32 a, u32 b) {
+    if (a < b) {
+        return a;
+    }
+    return b;
+}
+
+static u32
+max_u32(u32 a, u32 b) {
+    if (a < b) {
+        return b;
+    }
+    return a;
+}
+
 static uint
 min_uint(uint a, uint b) {
     if (a < b) {
@@ -219,6 +235,32 @@ unsafe_make_c_string_from_ptr(u8* ptr) {
 	c_string s = {};
 	s.ptr = ptr;
 	s.len = len;
+	return s;
+}
+
+/*/doc
+
+Parameter {max_len} specifies max length (in bytes) of the resulting string.
+
+If null byte is not found before reaching {max_len}, then resulting string length
+will be recorded as {max_len}.
+
+Parameter {ptr} must be not nil.
+*/
+static str
+make_str_from_c_string_ptr(u8* ptr, uint max_len) {
+	must(ptr != nil);
+	str s = {};
+	s.ptr = ptr;
+
+	for (uint i = 0; i < max_len; i += 1) {
+		if (ptr[i] == 0) {
+			s.len = i;
+			return s;
+		}
+	}
+
+	s.len = max_len;
 	return s;
 }
 

@@ -67,19 +67,8 @@ log_prefix_table[LOG_LEVEL_DEBUG + 1];
 
 static void
 init_log(Logger* lg, str path, u8 level) {
-    u8 path_buf[OS_LINUX_MAX_PATH_LENGTH];
-    c_string cstr_path = unsafe_copy_as_c_string(make_span_u8(path_buf, OS_LINUX_MAX_PATH_LENGTH), path);
-
-    u32 flags = OS_LINUX_OPEN_FLAG_CREATE | OS_LINUX_OPEN_FLAG_TRUNCATE | OS_LINUX_OPEN_FLAG_WRITE_ONLY;
-    sint n = os_linux_amd64_syscall_open(cstr_path.ptr, flags, 0644);
-    if (n > 0) {
-        lg->fd = cast(uint, n);
-    } else {
-        lg->fd = 0;
-    }
-    
-    lg->pos = 0;
-    lg->level = level;
+    static_assert(LOG_BUFFER_SIZE >= 1024);
+    must(path.len != 0);
 
     // TODO: make prefix initialization once per program start
     log_prefix_table[LOG_LEVEL_FATAL] = ss("[fatal] ");
@@ -87,6 +76,25 @@ init_log(Logger* lg, str path, u8 level) {
     log_prefix_table[LOG_LEVEL_WARN]  = ss(" [warn] ");
     log_prefix_table[LOG_LEVEL_INFO]  = ss(" [info] ");
     log_prefix_table[LOG_LEVEL_DEBUG] = ss("[debug] ");
+
+    lg->fd = 0;
+    lg->pos = 0;
+    lg->level = level;
+
+    if (path.len >= OS_LINUX_MAX_PATH_LENGTH) {
+        return;
+    }
+
+    u8 path_buf[OS_LINUX_MAX_PATH_LENGTH];
+    c_string cstr_path = unsafe_copy_as_c_string(make_span_u8(path_buf, OS_LINUX_MAX_PATH_LENGTH), path);
+
+    u32 flags = OS_LINUX_OPEN_FLAG_CREATE | OS_LINUX_OPEN_FLAG_TRUNCATE | OS_LINUX_OPEN_FLAG_WRITE_ONLY;
+    sint n = os_linux_amd64_syscall_open(cstr_path.ptr, flags, 0644);
+    if (n <= 0) {
+        return;
+    }
+
+    lg->fd = cast(uint, n);
 }
 
 static bool
@@ -123,9 +131,24 @@ log_file_write(Logger* lg, span_u8 s) {
 }
 
 static void
+log_file_close(Logger* lg) {
+    if (lg->fd == 0) {
+        return;
+    }
+    
+    os_linux_amd64_syscall_close(lg->fd);
+}
+
+static void
 log_flush(Logger* lg) {
     log_file_write(lg, log_buffer_head(lg));
     lg->pos = 0;
+}
+
+static void
+log_close(Logger* lg) {
+    log_flush(lg);
+    log_file_close(lg);
 }
 
 static void
@@ -269,6 +292,21 @@ log_warn(Logger* lg, str s) {
 static void
 log_error(Logger* lg, str s) {
     log_message(lg, LOG_LEVEL_ERROR, s);
+}
+
+static void
+log_debug_field(Logger* lg, str s, LogField field) {
+    log_message_field(lg, LOG_LEVEL_DEBUG, s, field);
+}
+
+static void
+log_info_field(Logger* lg, str s, LogField field) {
+    log_message_field(lg, LOG_LEVEL_INFO, s, field);
+}
+
+static void
+log_warn_field(Logger* lg, str s, LogField field) {
+    log_message_field(lg, LOG_LEVEL_WARN, s, field);
 }
 
 static void
