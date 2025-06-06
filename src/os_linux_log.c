@@ -21,11 +21,14 @@ typedef struct {
 #define LOG_FIELD_U64 0
 #define LOG_FIELD_S64 1
 #define LOG_FIELD_STR 2
+#define LOG_FIELD_PTR 3
 
 typedef union {
     u64 u64;
     s64 s64;
     str str;
+
+    void* ptr;
 } LogFieldValue;
 
 typedef struct {
@@ -60,6 +63,15 @@ log_field_str(str name, str value) {
     field.name = name;
     field.kind = LOG_FIELD_STR;
     return field;
+}
+
+static LogField
+log_field_ptr(str name, void* value) {
+    LogField field = {};
+    field.value.ptr = value;
+    field.name = name;
+    field.kind = LOG_FIELD_PTR;
+    return field;    
 }
 
 static str
@@ -224,6 +236,20 @@ log_write_field_value_str(Logger* lg, str value) {
 }
 
 static void
+log_write_field_value_ptr(Logger* lg, void* ptr) {
+    const uint fmt_ptr_length = 2 + 16; // 0x + hex number
+    if (log_buffer_left(lg) < fmt_ptr_length) {
+        log_flush(lg);
+    }
+
+    span_u8 tail = log_buffer_tail(lg);
+    tail.ptr[0] = '0';
+    tail.ptr[1] = 'x';
+    unsafe_fmt_hex_prefix_zeroes_u64(span_u8_slice_tail(tail, 2), cast(u64, ptr));
+    lg->pos += fmt_ptr_length;
+}
+
+static void
 log_write_field_value(Logger* lg, u8 kind, LogFieldValue value) {
     switch (kind) {
     case LOG_FIELD_U64:
@@ -234,6 +260,9 @@ log_write_field_value(Logger* lg, u8 kind, LogFieldValue value) {
         return;
     case LOG_FIELD_STR:
         log_write_field_value_str(lg, value.str);
+        return;
+    case LOG_FIELD_PTR:
+        log_write_field_value_ptr(lg, value.ptr);
         return;
     default:
         panic_trap();

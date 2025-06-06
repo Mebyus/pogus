@@ -39,7 +39,7 @@ typedef uint pint;
 #define nil 0
 
 // These should only be used with boolean type.
-#define true 1
+#define true  1
 #define false 0
 
 // Macro for type cast with fancy syntax.
@@ -354,6 +354,18 @@ get_align_offset(void* ptr, uint a) {
 	uint p = cast(uint, ptr);
 	return align_uint(p, a) - p;
 }
+
+static u64
+rotate_left_u64(u64 x, uint k) {
+	const uint mask = 64 - 1;
+	k = k & mask;
+	if (k == 0) {
+		return x;
+	}
+
+    return (x << k) | (x >> (64 - k));
+}
+
 
 static u8
 fmt_dec_digit(u8 x) {

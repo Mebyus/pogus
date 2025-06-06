@@ -207,6 +207,49 @@ os_linux_convert_syscall_stat_error(uint c) {
     return c; // TODO: make proper error conversion
 }
 
+#define OS_LINUX_AMD64_SYSCALL_MMAP 9
+
+#define OS_LINUX_MEMORY_MAP_PROT_READ  0x1
+#define OS_LINUX_MEMORY_MAP_PROT_WRITE 0x2
+
+#define OS_LINUX_MEMORY_MAP_SHARED    0x01
+#define OS_LINUX_MEMORY_MAP_PRIVATE   0x02
+#define OS_LINUX_MEMORY_MAP_ANONYMOUS 0x20
+
+static sint
+os_linux_amd64_syscall_mmap(void* ptr, uint len, uint prot, uint flags, uint fd, uint offset) {
+    register sint  rax __asm__ ("rax") = OS_LINUX_AMD64_SYSCALL_MMAP;
+    register void* rdi __asm__ ("rdi") = ptr;
+    register uint  rsi __asm__ ("rsi") = len;
+    register uint  rdx __asm__ ("rdx") = prot;
+    register uint  r10 __asm__ ("r10") = flags;
+    register uint  r8  __asm__ ("r8")  = fd;
+    register uint  r9  __asm__ ("r9")  = offset;
+    __asm__ __volatile__ (
+        "syscall"
+        : "+r" (rax)
+        : "r" (rdi), "r" (rsi), "r" (rdx), "r" (r10), "r" (r8), "r" (r9)
+        : "rcx", "r11", "memory"
+    );
+    return rax;
+}
+
+#define OS_LINUX_AMD64_SYSCALL_MUNMAP 11
+
+static sint
+os_linux_amd64_syscall_munmap(void* ptr, uint len) {
+    register sint  rax __asm__ ("rax") = OS_LINUX_AMD64_SYSCALL_MUNMAP;
+    register void* rdi __asm__ ("rdi") = ptr;
+    register uint  rsi __asm__ ("rsi") = len;
+    __asm__ __volatile__ (
+        "syscall"
+        : "+r" (rax)
+        : "r" (rdi), "r" (rsi)
+        : "rcx", "r11", "memory"
+    );
+    return rax;
+}
+
 #define OS_LINUX_AMD64_SYSCALL_EXIT 60
 
 static _Noreturn void
@@ -373,6 +416,46 @@ os_linux_read_all(uint fd, span_u8 buf) {
     }
 
     return ret;
+}
+
+
+static ErrorCode
+os_linux_convert_syscall_mmap_error(uint c) {
+    return c; // TODO: make proper error conversion
+}
+
+#define OS_LINUX_PAGE_SIZE (1 << 12)
+
+/*/doc
+
+Allocates memory in page-sized chunks directly from operating system.
+*/
+static ErrorCode
+os_linux_mem_alloc(MemBlock* block) {
+    uint len = block->span.len;
+    must(len != 0);
+
+    len = align_uint(len, OS_LINUX_PAGE_SIZE);
+
+    const uint prot = OS_LINUX_MEMORY_MAP_PROT_READ | OS_LINUX_MEMORY_MAP_PROT_WRITE;
+    const uint flags = OS_LINUX_MEMORY_MAP_PRIVATE | OS_LINUX_MEMORY_MAP_ANONYMOUS;
+    sint n = os_linux_amd64_syscall_mmap(nil, len, prot, flags, 0, 0);
+    if (n < 0) {
+        return os_linux_convert_syscall_mmap_error(cast(uint, -n));
+    }
+
+    block->span.ptr = cast(u8*, n);
+    block->span.len = len;
+    block->id = 0;
+    return 0;
+}
+
+static void
+os_linux_mem_free(MemBlock block) {
+    sint n = os_linux_amd64_syscall_munmap(block.span.ptr, block.span.len);
+    if (n < 0) {
+        panic_trap();
+    }
 }
 
 /*

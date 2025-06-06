@@ -11,3 +11,11 @@
     #link xcb
     #link vulkan
 }
+
+#build game_gl {
+    #root main_opengl.c
+
+    #link xcb
+    #link GL
+    #link X11-xcb
+}
