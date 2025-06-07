@@ -32,6 +32,8 @@ typedef enum {
 typedef struct vk_ObjectInstance*        vk_Instance;
 typedef struct vk_ObjectPhysicalDevice*  vk_PhysicalDevice;
 typedef struct vk_ObjectSurfaceKHR*      vk_SurfaceKHR;
+typedef struct vk_ObjectDevice*          vk_Device;
+typedef struct vk_ObjectCommandPool*     vk_CommandPool;
 /* =================== */
 
 typedef struct {

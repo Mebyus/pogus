@@ -11,6 +11,8 @@ typedef struct {
     vk_Instance       instance;
     vk_PhysicalDevice physical_device;
     vk_SurfaceKHR     surface;
+
+    u32 graphics_queue_family;
 } VulkanContext;
 
 /*/doc
@@ -146,8 +148,9 @@ log_vulkan_error(Logger *lg, str s, vk_Result r) {
     log_error_field(lg, s, log_field_s64(ss("vk_result"), r));
 }
 
-#define VULKAN_MAX_PHYSICAL_DEVICES  2
-#define VULKAN_MAX_DEVICE_EXTENSIONS 256
+#define VULKAN_MAX_PHYSICAL_DEVICES      2
+#define VULKAN_MAX_DEVICE_EXTENSIONS     256
+#define VULKAN_MAX_DEVICE_QUEUE_FAMILIES 16
 
 static void
 init_vulkan(EngineHarness* h) {
@@ -246,6 +249,34 @@ init_vulkan(EngineHarness* h) {
         log_vulkan_error(&h->lg, ss("swapchain device extension not found"), r);
         engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
         return;
+    }
+
+    u32 queue_family_count;
+    vk_get_physical_device_queue_family_properties(h->vk.physical_device, &queue_family_count, nil);
+    if (queue_family_count == 0) {
+        log_error(&h->lg, ss("physical device has no queue families"));
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+    log_info_field(&h->lg, ss("enumerate vulkan physical device queue families"), log_field_u64(ss("count"), queue_family_count));
+
+    // Find queue family with graphics support
+    // Note: is a transfer queue necessary to copy vertices to the gpu or can a graphics queue handle that?
+    // TODO: log warning if VULKAN_MAX_DEVICE_QUEUE_FAMILIES is too small
+    queue_family_count = min_u32(queue_family_count, VULKAN_MAX_DEVICE_QUEUE_FAMILIES);
+    vk_QueueFamilyProperties queue_families[VULKAN_MAX_DEVICE_QUEUE_FAMILIES];
+    vk_get_physical_device_queue_family_properties(h->vk.physical_device, &queue_family_count, queue_families);
+    for (u32 i = 0; i < queue_family_count; i += 1) {
+        if (queue_families[i].queue_count == 0) {
+            continue;
+        }
+
+        if ((queue_families[i].queue_flags & VK_QUEUE_GRAPHICS_BIT) != 0) {
+            h->vk.graphics_queue_family = i;
+            log_info_field(&h->lg, ss("found graphics queue family"), log_field_u64(ss("family"), i));
+        }
+
+        // TODO: exit if we unable to find appropriate queue
     }
 
     vk_XcbSurfaceCreateInfoKHR surface_create_info = {};

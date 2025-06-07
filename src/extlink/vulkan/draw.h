@@ -373,14 +373,104 @@ typedef enum {
     VK_COMPOSITE_ALPHA_FLAG_BITS_MAX_ENUM_KHR = 0x7FFFFFFF
 } vk_CompositeAlphaFlagBitsKHR;
 
+typedef enum {
+    VK_COMMAND_BUFFER_LEVEL_PRIMARY = 0,
+    VK_COMMAND_BUFFER_LEVEL_SECONDARY = 1,
+    VK_COMMAND_BUFFER_LEVEL_MAX_ENUM = 0x7FFFFFFF
+} vk_CommandBufferLevel;
+
+typedef enum {
+    VK_IMAGE_LAYOUT_UNDEFINED = 0,
+    VK_IMAGE_LAYOUT_GENERAL = 1,
+    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL = 2,
+    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL = 3,
+    VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL = 4,
+    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL = 5,
+    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL = 6,
+    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL = 7,
+    VK_IMAGE_LAYOUT_PREINITIALIZED = 8,
+    VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL = 1000117000,
+    VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL = 1000117001,
+    VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL = 1000241000,
+    VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL = 1000241001,
+    VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL = 1000241002,
+    VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL = 1000241003,
+    VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL = 1000314000,
+    VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL = 1000314001,
+    VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ = 1000232000,
+    VK_IMAGE_LAYOUT_PRESENT_SRC_KHR = 1000001002,
+    VK_IMAGE_LAYOUT_VIDEO_DECODE_DST_KHR = 1000024000,
+    VK_IMAGE_LAYOUT_VIDEO_DECODE_SRC_KHR = 1000024001,
+    VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR = 1000024002,
+    VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR = 1000111000,
+    VK_IMAGE_LAYOUT_FRAGMENT_DENSITY_MAP_OPTIMAL_EXT = 1000218000,
+    VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR = 1000164003,
+    VK_IMAGE_LAYOUT_VIDEO_ENCODE_DST_KHR = 1000299000,
+    VK_IMAGE_LAYOUT_VIDEO_ENCODE_SRC_KHR = 1000299001,
+    VK_IMAGE_LAYOUT_VIDEO_ENCODE_DPB_KHR = 1000299002,
+    VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT = 1000339000,
+    VK_IMAGE_LAYOUT_VIDEO_ENCODE_QUANTIZATION_MAP_KHR = 1000553000,
+    VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL_KHR = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL,
+    VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL_KHR = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL,
+    VK_IMAGE_LAYOUT_SHADING_RATE_OPTIMAL_NV = VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR,
+    VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ_KHR = VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ,
+    VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL_KHR = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+    VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL_KHR = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL,
+    VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL_KHR = VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL,
+    VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL_KHR = VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL,
+    VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL,
+    VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
+    VK_IMAGE_LAYOUT_MAX_ENUM = 0x7FFFFFFF
+} vk_ImageLayout;
+
+
+typedef enum {
+    VK_SAMPLE_COUNT_1_BIT = 0x00000001,
+    VK_SAMPLE_COUNT_2_BIT = 0x00000002,
+    VK_SAMPLE_COUNT_4_BIT = 0x00000004,
+    VK_SAMPLE_COUNT_8_BIT = 0x00000008,
+    VK_SAMPLE_COUNT_16_BIT = 0x00000010,
+    VK_SAMPLE_COUNT_32_BIT = 0x00000020,
+    VK_SAMPLE_COUNT_64_BIT = 0x00000040,
+    VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM = 0x7FFFFFFF
+} vk_SampleCountFlagBits;
+
+typedef enum {
+    VK_ATTACHMENT_LOAD_OP_LOAD = 0,
+    VK_ATTACHMENT_LOAD_OP_CLEAR = 1,
+    VK_ATTACHMENT_LOAD_OP_DONT_CARE = 2,
+    VK_ATTACHMENT_LOAD_OP_NONE = 1000400000,
+    VK_ATTACHMENT_LOAD_OP_NONE_EXT = VK_ATTACHMENT_LOAD_OP_NONE,
+    VK_ATTACHMENT_LOAD_OP_NONE_KHR = VK_ATTACHMENT_LOAD_OP_NONE,
+    VK_ATTACHMENT_LOAD_OP_MAX_ENUM = 0x7FFFFFFF
+} vk_AttachmentLoadOp;
+
+typedef enum {
+    VK_ATTACHMENT_STORE_OP_STORE = 0,
+    VK_ATTACHMENT_STORE_OP_DONT_CARE = 1,
+    VK_ATTACHMENT_STORE_OP_NONE = 1000301000,
+    VK_ATTACHMENT_STORE_OP_NONE_KHR = VK_ATTACHMENT_STORE_OP_NONE,
+    VK_ATTACHMENT_STORE_OP_NONE_QCOM = VK_ATTACHMENT_STORE_OP_NONE,
+    VK_ATTACHMENT_STORE_OP_NONE_EXT = VK_ATTACHMENT_STORE_OP_NONE,
+    VK_ATTACHMENT_STORE_OP_MAX_ENUM = 0x7FFFFFFF
+} vk_AttachmentStoreOp;
+
+typedef enum {
+    VK_PIPELINE_BIND_POINT_GRAPHICS = 0,
+    VK_PIPELINE_BIND_POINT_COMPUTE = 1,
+
+    // Beta extension
+    VK_PIPELINE_BIND_POINT_EXECUTION_GRAPH_AMDX = 1000134000,
+    
+    VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR = 1000165000,
+    VK_PIPELINE_BIND_POINT_SUBPASS_SHADING_HUAWEI = 1000369003,
+    VK_PIPELINE_BIND_POINT_RAY_TRACING_NV = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+    VK_PIPELINE_BIND_POINT_MAX_ENUM = 0x7FFFFFFF
+} vk_PipelineBindPoint;
+
 /* Opaque handle types */
 typedef struct vk_ObjectSwapchainKHR* vk_SwapchainKHR;
 /* =================== */
-
-typedef struct {
-    u32 width;
-    u32 height;
-} vk_Extent2D;
 
 typedef struct {
     vk_StructureType type;
@@ -413,3 +503,73 @@ typedef struct {
     vk_Bool32                        clipped;
     vk_SwapchainKHR                  old_swapchain;
 } vk_SwapchainCreateInfoKHR;
+
+typedef struct {
+    vk_StructureType  type;
+    const void*       next;
+    u32               flags;
+    u32               queue_family_index;
+} vk_CommandPoolCreateInfo;
+
+typedef struct {
+    vk_StructureType        type;
+    const void*             next;
+    vk_CommandPool          command_Pool;
+    vk_CommandBufferLevel   level;
+    u32                     command_buffer_count;
+} vk_CommandBufferAllocateInfo;
+
+typedef struct {
+    u32    flags;
+    vk_Format                        format;
+    vk_SampleCountFlagBits           samples;
+    vk_AttachmentLoadOp              load_op;
+    vk_AttachmentStoreOp             store_op;
+    vk_AttachmentLoadOp              stencil_load_op;
+    vk_AttachmentStoreOp             stencil_store_op;
+    vk_ImageLayout                   initial_layout;
+    vk_ImageLayout                   final_layout;
+} vk_AttachmentDescription;
+
+typedef struct {
+    u32               attachment;
+    vk_ImageLayout    layout;
+} vk_AttachmentReference;
+
+typedef struct {
+    u32                             flags;
+    vk_PipelineBindPoint             pipeline_bind_point;
+    u32                             input_attachment_count;
+    const vk_AttachmentReference*   input_attachments;
+    u32                             color_attachment_count;
+    const vk_AttachmentReference*   color_attachments;
+    const vk_AttachmentReference*   resolve_attachments;
+    const vk_AttachmentReference*   depth_stencil_attachment;
+    u32                             preserve_attachment_count;
+    const u32*                      preserve_attachments;
+} vk_SubpassDescription;
+
+typedef struct {
+    u32  src_subpass;
+    u32  dst_subpass;
+
+    u32  src_stage_mask;
+    u32  dst_stage_mask;
+
+    u32  src_access_mask;
+    u32  dst_access_mask;
+
+    u32  dependency_flags;
+} VkSubpassDependency;
+
+typedef struct {
+    vk_StructureType                  type;
+    const void*                       next;
+    u32                               flags;
+    u32                               attachment_count;
+    const vk_AttachmentDescription*    attachments;
+    u32                               subpass_count;
+    const vk_SubpassDescription*       subpasses;
+    u32                               dependency_count;
+    const VkSubpassDependency*        dependencies;
+} vk_RenderPassCreateInfo;

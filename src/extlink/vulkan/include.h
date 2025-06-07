@@ -1,4 +1,5 @@
 #include "base.h"
+#include "geometry.h"
 #include "device.h"
 #include "memory.h"
 #include "draw.h"
