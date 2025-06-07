@@ -48,6 +48,9 @@ typedef uint pint;
 // Shorthand for C string literal to span conversion.
 #define ss(s) make_str((u8*)(u8##s), sizeof(u8##s) - 1)
 
+// Gives number of elements in non-decayed array.
+#define array_len(a) (sizeof(a) / sizeof(*a))
+
 _Noreturn static void
 panic_trap(void) {
 	__builtin_trap();
@@ -336,6 +339,35 @@ make_span_str(void* ptr, uint len) {
     s.ptr = ptr;
     s.len = len;
     return s;
+}
+
+typedef struct {
+	s64* ptr;
+	uint len;
+} span_s64;
+
+static span_s64
+make_span_s64(s64* ptr, uint len) {
+    span_s64 s = {};
+	if (len == 0) {
+		return s;
+	}
+
+    s.ptr = ptr;
+    s.len = len;
+    return s;
+}
+
+static span_s64
+span_s64_slice_head(span_s64 s, uint n) {
+	must(n <= s.len);
+	return make_span_s64(s.ptr, n);
+}
+
+static span_s64
+span_s64_slice_tail(span_s64 s, uint n) {
+	must(n <= s.len);
+	return make_span_s64(s.ptr + n, s.len - n);
 }
 
 /*

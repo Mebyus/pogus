@@ -43,3 +43,14 @@ biski64_seed(Biski64State* state, u64 seed) {
 
     biski64_warmup(state);
 }
+
+/*/doc
+
+Fills span of integers with randomly generated numbers.
+*/
+static void
+biski64_fill_s64(Biski64State* state, span_s64 s) {
+    for (uint i = 0; i < s.len; i += 1) {
+        s.ptr[i] = cast(s64, biski64_next(state));
+    }
+}

@@ -23,10 +23,14 @@ typedef struct {
 #define LOG_FIELD_STR 2
 #define LOG_FIELD_PTR 3
 
+#define LOG_FIELD_SPAN_S64 4
+
 typedef union {
     u64 u64;
     s64 s64;
     str str;
+
+    span_s64 span_s64;
 
     void* ptr;
 } LogFieldValue;
@@ -71,6 +75,16 @@ log_field_ptr(str name, void* value) {
     field.value.ptr = value;
     field.name = name;
     field.kind = LOG_FIELD_PTR;
+    return field;    
+}
+
+
+static LogField
+log_field_span_s64(str name, span_s64 value) {
+    LogField field = {};
+    field.value.span_s64 = value;
+    field.name = name;
+    field.kind = LOG_FIELD_SPAN_S64;
     return field;    
 }
 
@@ -250,6 +264,23 @@ log_write_field_value_ptr(Logger* lg, void* ptr) {
 }
 
 static void
+log_write_field_value_span_s64(Logger* lg, span_s64 value) {
+    log_put_byte(lg, '[');
+    if (value.len == 0) {
+        log_put_byte(lg, ']');
+        return;
+    }
+
+    log_write_field_value_s64(lg, value.ptr[0]);
+    for (uint i = 1; i < value.len; i += 1) {
+        log_put_byte(lg, ',');
+        log_space(lg);
+        log_write_field_value_s64(lg, value.ptr[i]);
+    }
+    log_put_byte(lg, ']');
+}
+
+static void
 log_write_field_value(Logger* lg, u8 kind, LogFieldValue value) {
     switch (kind) {
     case LOG_FIELD_U64:
@@ -263,6 +294,9 @@ log_write_field_value(Logger* lg, u8 kind, LogFieldValue value) {
         return;
     case LOG_FIELD_PTR:
         log_write_field_value_ptr(lg, value.ptr);
+        return;
+    case LOG_FIELD_SPAN_S64:
+        log_write_field_value_span_s64(lg, value.span_s64);
         return;
     default:
         panic_trap();

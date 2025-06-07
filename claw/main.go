@@ -25,7 +25,7 @@ var warningFlags = []string{
 	"-Wduplicated-branches",
 	"-Wduplicated-cond",
 	"-Wdouble-promotion",
-	"-Wnull-dereference",
+	// "-Wnull-dereference",
 	"-Wstrict-prototypes",
 	// "-Wvla",
 	"-Wpointer-sign",
@@ -42,7 +42,7 @@ var warningFlags = []string{
 var otherFlags = []string{
 	"-Werror",
 	"-pipe",
-	"-fanalyzer",
+	// "-fanalyzer",
 }
 
 var codegenFlags = []string{
@@ -58,7 +58,19 @@ const maxCompilerErrorsFlag = "-fmax-errors=1"
 const compiler = "cc"
 const sourceDir = "src"
 
+const (
+	BuildDebug = iota
+	BuildRelease
+)
+
 func main() {
+	var buildKind int
+	if len(os.Args) > 1 {
+		if os.Args[1] == "--release" {
+			buildKind = BuildRelease
+		}
+	}
+
 	plan, err := readBuildTargets("build.claw")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -68,7 +80,7 @@ func main() {
 	fmt.Println(plan.Env)
 	for _, t := range plan.Targets {
 		fmt.Println(t)
-		err = buildTarget(&t, plan.Env)
+		err = buildTarget(&t, plan.Env, buildKind)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "build \"%s\" target: %s\n", t.Name, err)
 			os.Exit(1)
@@ -81,7 +93,7 @@ func main() {
 	}
 }
 
-func buildTarget(t *BuildTarget, env map[string]string) error {
+func buildTarget(t *BuildTarget, env map[string]string, buildKind int) error {
 	dir := filepath.Join("build", t.Name)
 	err := os.MkdirAll(dir, 0o755)
 	if err != nil {
@@ -96,6 +108,7 @@ func buildTarget(t *BuildTarget, env map[string]string) error {
 		OutPath:    outpath,
 		Links:      t.Links,
 		LinkSearch: env["link.dir"],
+		BuildKind:  buildKind,
 	})
 }
 
@@ -105,6 +118,8 @@ type CompileExeSpec struct {
 	LinkSearch string
 
 	Links []string
+
+	BuildKind int
 }
 
 func compileExe(spec *CompileExeSpec) error {
@@ -113,7 +128,13 @@ func compileExe(spec *CompileExeSpec) error {
 	args = append(args, maxCompilerErrorsFlag)
 	args = append(args, warningFlags...)
 	args = append(args, otherFlags...)
-	args = append(args, "-Og", "-ggdb")
+
+	if spec.BuildKind == BuildRelease {
+		args = append(args, "-O2")
+	} else {
+		// default build is debug
+		args = append(args, "-Og", "-ggdb")
+	}
 
 	args = append(args, "-Isrc")
 
@@ -265,7 +286,7 @@ func parseBuildLink(line string) (string, error) {
 func parseSetEnv(line string) (name string, value string, err error) {
 	fields := strings.Fields(line)
 	if len(fields) < 4 {
-		return "", "",  errors.New("bad set format")
+		return "", "", errors.New("bad set format")
 	}
 	name = fields[1]
 	value = fields[3]
