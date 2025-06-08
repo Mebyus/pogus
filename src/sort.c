@@ -46,6 +46,29 @@ insert_sort_s64(span_s64 s) {
 }
 
 static void
+bubble_sort_s64(span_s64 s) {
+    if (s.len < 2) {
+        return;
+    }
+
+    for (uint j = 0; j < s.len - 1; j += 1) {
+        uint count = 0;
+        for (uint i = 1; i < s.len - j; i += 1) {
+            if (s.ptr[i - 1] > s.ptr[i]) {
+                s64 c = s.ptr[i - 1];
+                s.ptr[i - 1] = s.ptr[i];
+                s.ptr[i] = c;
+                count += 1;
+            }
+        }
+        
+        if (count == 0) {
+            return;
+        }
+    }
+}
+
+static void
 quick_sort_s64(span_s64 s) {
     if (s.len <= 16) {
         insert_sort_s64(s);

@@ -3,6 +3,7 @@
 #include "os_linux_log.c"
 #include "rand.c"
 #include "sort.c"
+#include "strconv.c"
 
 uint main(uint argc, u8** argv, u8** envp) {
     init_proc_mem_bump_allocator();
@@ -18,7 +19,11 @@ uint main(uint argc, u8** argv, u8** envp) {
     uint num_gen = 1 << 27;
     if (os_proc_input.args.len >= 2) {
         str num_str = os_proc_input.args.ptr[1];
-        (void)(num_str);
+        RetParseU64 r = parse_dec_u64(num_str);
+        if (r.code != 0) {
+            return r.code;
+        }
+        num_gen = r.n;
     }
 
     MemBlock block = {};
@@ -38,6 +43,7 @@ uint main(uint argc, u8** argv, u8** envp) {
     
     // s64 array[] = {3, 4, 0, -2, 0, 1, -5, 10, 11, 12, 0, 12, 4, 3, 1, 1};
     span_s64 s = make_span_s64(cast(s64*, block.span.ptr), num_gen);
+    log_debug_field(&lg, ss("generate test data"), log_field_u64(ss("len"), num_gen));
     biski64_fill_s64(&state, s);
     // log_debug_field(&lg, ss("test before sort"), log_field_span_s64(ss("span"), s));
     quick_sort_s64(s);
