@@ -449,6 +449,43 @@ fmt_hex_prefix_zeroes_u64(span_u8 buf, u64 x) {
 	return max_u64_hex_length;
 }
 
+const uint max_u32_hex_length = 8;
+
+/*/doc
+
+Formats a given u32 integer as a hexadecimal number of
+fixed width (=8) format, prefixing significant digits with
+zeroes if necessary. Buffer must be at least 16 bytes
+long.
+*/
+static void
+unsafe_fmt_hex_prefix_zeroes_u32(span_u8 buf, u32 x) {
+	uint i = max_u32_hex_length;
+	// digits are written from least to most significant bit
+	while (i != 0) {
+		i -= 1;
+		const u8 n = cast(u8, x & 0xF);
+		buf.ptr[i] = fmt_hex_digit(n);
+		x = x >> 4;
+	}
+}
+
+/*/doc
+
+Returns number of bytes actually written. In practice it will always
+be either 0 or 16.
+*/
+static uint
+fmt_hex_prefix_zeroes_u32(span_u8 buf, u32 x) {
+	if (buf.len < max_u32_hex_length) {
+		return 0;
+	}
+	must(buf.ptr != nil);
+
+	unsafe_fmt_hex_prefix_zeroes_u32(buf, x);
+	return max_u32_hex_length;
+}
+
 /*/doc
 
 Puts decimal digits of a number in reverse order inside an array of bytes.
@@ -630,6 +667,12 @@ static void
 unsafe_fmt_buffer_put_hex_prefix_zeroes_u64(FormatBuffer* buf, u64 x) {
 	unsafe_fmt_hex_prefix_zeroes_u64(fmt_buffer_tail(buf), x);
 	buf->len += max_u64_hex_length;
+}
+
+static void
+unsafe_fmt_buffer_put_hex_prefix_zeroes_u32(FormatBuffer* buf, u32 x) {
+	unsafe_fmt_hex_prefix_zeroes_u32(fmt_buffer_tail(buf), x);
+	buf->len += max_u32_hex_length;
 }
 
 /*/doc

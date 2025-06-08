@@ -484,6 +484,35 @@ clear_mem_blob(MemBlob* blob) {
 
 #define ERROR_LONG_PATH 2
 
+typedef struct {
+    // File descriptor of opened file.
+    uint fd;
+
+    ErrorCode code;
+} RetOpen;
+
+static RetOpen
+os_open(str path) {
+    must(path.len != 0);
+
+    RetOpen ret = {};
+    if (path.len >= OS_LINUX_MAX_PATH_LENGTH) {
+        ret.code = ERROR_LONG_PATH;
+        return ret;
+    }
+
+    u8 path_buf[OS_LINUX_MAX_PATH_LENGTH];
+    c_string cstr_path = unsafe_copy_as_c_string(make_span_u8(path_buf, OS_LINUX_MAX_PATH_LENGTH), path);
+
+    sint n = os_linux_amd64_syscall_open(cstr_path.ptr, OS_LINUX_OPEN_FLAG_READ_ONLY, 0);
+    if (n < 0) {
+        ret.code = os_linux_convert_syscall_open_error(cast(uint, -n)); 
+        return ret;
+    }
+    ret.fd = cast(uint, n);
+    return ret;
+}
+
 /*
 Reads entire file into memory provided by allocator.
 

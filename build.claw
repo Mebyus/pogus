@@ -19,3 +19,7 @@
     #link GL
     #link X11-xcb
 }
+
+#build crc {
+    #root main_crc.c
+}

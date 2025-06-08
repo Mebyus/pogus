@@ -79,7 +79,7 @@ func main() {
 
 	fmt.Println(plan.Env)
 	for _, t := range plan.Targets {
-		fmt.Println(t)
+		fmt.Printf("%s: %v\n", t.Name, t.Links)
 		err = buildTarget(&t, plan.Env, buildKind)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "build \"%s\" target: %s\n", t.Name, err)
