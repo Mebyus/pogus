@@ -23,3 +23,7 @@
 #build crc {
     #root main_crc.c
 }
+
+#build copy {
+    #root main_copy.c
+}

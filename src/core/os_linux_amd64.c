@@ -286,19 +286,6 @@ os_linux_convert_syscall_write_error(uint c) {
     return c; // TODO: make proper error conversion
 }
 
-/*
-Describes result returned by any write-like operation.
-*/
-typedef struct {
-    // Actual number of bytes written.
-    //
-    // Can be not zero even if error code is not zero.
-    uint count;
-
-    // Error code produced by write.
-    ErrorCode code;
-} RetWrite;
-
 static RetWrite
 os_linux_write(uint fd, span_u8 buf) {
     RetWrite ret = {};
@@ -349,27 +336,10 @@ static void stderr_write(span_u8 s) {
     os_linux_write_all(OS_LINUX_STDERR, s);
 }
 
-// Common outcome for read-like operations. Other error codes
-// should not squat this value.
-#define ERROR_READ_EOF 1
-
 static ErrorCode
 os_linux_convert_syscall_read_error(uint c) {
     return c; // TODO: make proper error conversion
 }
-
-/*
-Describes result returned by any read-like operation.
-*/
-typedef struct {
-    // Actual number of bytes read.
-    //
-    // Can be not zero even if error code is not zero.
-    uint count;
-
-    // Error code produced by read.
-    ErrorCode code;
-} RetRead;
 
 static RetRead
 os_linux_read(uint fd, span_u8 buf) {
@@ -381,7 +351,7 @@ os_linux_read(uint fd, span_u8 buf) {
 
     sint n = os_linux_amd64_syscall_read(fd, buf.ptr, buf.len);
     if (n == 0) {
-        ret.code = ERROR_READ_EOF;
+        ret.code = ERROR_READER_EOF;
         return ret;
     }
     if (n < 0) {
@@ -492,7 +462,7 @@ typedef struct {
 } RetOpen;
 
 static RetOpen
-os_open(str path) {
+os_open_file(str path, u32 flags, u32 mode) {
     must(path.len != 0);
 
     RetOpen ret = {};
@@ -504,13 +474,23 @@ os_open(str path) {
     u8 path_buf[OS_LINUX_MAX_PATH_LENGTH];
     c_string cstr_path = unsafe_copy_as_c_string(make_span_u8(path_buf, OS_LINUX_MAX_PATH_LENGTH), path);
 
-    sint n = os_linux_amd64_syscall_open(cstr_path.ptr, OS_LINUX_OPEN_FLAG_READ_ONLY, 0);
+    sint n = os_linux_amd64_syscall_open(cstr_path.ptr, flags, mode);
     if (n < 0) {
         ret.code = os_linux_convert_syscall_open_error(cast(uint, -n)); 
         return ret;
     }
     ret.fd = cast(uint, n);
     return ret;
+}
+
+static RetOpen
+os_open(str path) {
+    return os_open_file(path, OS_LINUX_OPEN_FLAG_READ_ONLY, 0);
+}
+
+static RetOpen
+os_create(str path) {
+    return os_open_file(path, OS_LINUX_OPEN_FLAG_WRITE_ONLY | OS_LINUX_OPEN_FLAG_CREATE | OS_LINUX_OPEN_FLAG_TRUNCATE, 0644);
 }
 
 /*
@@ -555,10 +535,36 @@ os_load_file(MemAllocator al, str path, MemBlob* blob) {
 
     RetRead r = os_linux_read_all(fd, blob->block.span);
     os_linux_amd64_syscall_close(fd);
-    if (r.code != 0 && r.code != ERROR_READ_EOF) {
+    if (r.code != 0 && r.code != ERROR_READER_EOF) {
         mem_free(al, blob->block);
         return r.code;
     }
 
     return 0;
+}
+
+const BagReaderTab bag_fd_reader_tab = {
+    .type_id = 3,
+    .read = cast(BagFuncRead, cast(void*, os_linux_read)),
+};
+
+static Reader
+bag_fd_reader(uint fd) {
+    Reader r = {};
+    r.ptr = cast(void*, fd); // TODO: maybe we should change void* in bag to just uint and name it "val"
+    r.tab = &bag_fd_reader_tab;
+    return r;    
+}
+
+const BagWriterTab bag_fd_writer_tab = {
+    .type_id = 4,
+    .write = cast(BagFuncWrite, cast(void*, os_linux_write)),
+};
+
+static Writer
+bag_fd_writer(uint fd) {
+    Writer w = {};
+    w.ptr = cast(void*, fd);
+    w.tab = &bag_fd_writer_tab;
+    return w;    
 }

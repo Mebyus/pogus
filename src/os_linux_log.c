@@ -91,21 +91,38 @@ log_field_span_s64(str name, span_s64 value) {
 static str
 log_prefix_table[LOG_LEVEL_DEBUG + 1];
 
+/*/doc
+
+Init logger with a given file descriptor. It must be open for writes
+in order for logger to work properly.
+*/
+static void
+init_log_fd(Logger* lg, uint fd, u8 level) {
+    if (log_prefix_table[0].len == 0) {
+        // TODO: make prefix initialization once per program start
+        // properly, without "if" hacks
+        //
+        // This is a hack to initialize table once per program
+        log_prefix_table[LOG_LEVEL_FATAL] = ss("[fatal] ");
+        log_prefix_table[LOG_LEVEL_ERROR] = ss("[error] ");
+        log_prefix_table[LOG_LEVEL_WARN]  = ss(" [warn] ");
+        log_prefix_table[LOG_LEVEL_INFO]  = ss(" [info] ");
+        log_prefix_table[LOG_LEVEL_DEBUG] = ss("[debug] ");
+    }
+
+    lg->fd = fd;
+    lg->pos = 0;
+    lg->level = level;
+}
+
 static void
 init_log(Logger* lg, str path, u8 level) {
     static_assert(LOG_BUFFER_SIZE >= 1024);
     must(path.len != 0);
 
-    // TODO: make prefix initialization once per program start
-    log_prefix_table[LOG_LEVEL_FATAL] = ss("[fatal] ");
-    log_prefix_table[LOG_LEVEL_ERROR] = ss("[error] ");
-    log_prefix_table[LOG_LEVEL_WARN]  = ss(" [warn] ");
-    log_prefix_table[LOG_LEVEL_INFO]  = ss(" [info] ");
-    log_prefix_table[LOG_LEVEL_DEBUG] = ss("[debug] ");
-
-    lg->fd = 0;
-    lg->pos = 0;
-    lg->level = level;
+    // This init is needed to setup discard logger when
+    // opening a file fails
+    init_log_fd(lg, 0, 0);
 
     if (path.len >= OS_LINUX_MAX_PATH_LENGTH) {
         return;
@@ -119,8 +136,9 @@ init_log(Logger* lg, str path, u8 level) {
     if (n <= 0) {
         return;
     }
+    uint fd = cast(uint, n);
 
-    lg->fd = cast(uint, n);
+    init_log_fd(lg, fd, level);
 }
 
 static bool

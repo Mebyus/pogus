@@ -1,5 +1,5 @@
-#include "types.c"
-#include "os_linux_amd64.c"
+#include "core/include.h"
+
 #include "link_libc.h"
 #include "os_linux_log.c"
 #include "window_linux.c"

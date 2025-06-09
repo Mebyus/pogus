@@ -1,5 +1,4 @@
-#include "types.c"
-#include "os_linux_amd64.c"
+#include "core/include.h"
 
 #define BUFFER_SIZE 1024
 

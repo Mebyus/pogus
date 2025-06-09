@@ -1,5 +1,5 @@
-#include "types.c"
-#include "os_linux_amd64.c"
+#include "core/include.h"
+
 #include "os_linux_log.c"
 #include "rand.c"
 #include "sort.c"
@@ -13,7 +13,8 @@ uint main(uint argc, u8** argv, u8** envp) {
     }
     
     Logger lg;
-    init_log(&lg, ss("opengl.log"), LOG_LEVEL_DEBUG);
+    init_log_fd(&lg, OS_LINUX_STDOUT, LOG_LEVEL_DEBUG);
+    log_debug_field(&lg, ss("test writer interface"), log_field_u64(ss("size"), sizeof(BagWriterTab)));
 
     // number of generated integers
     uint num_gen = 1 << 27;

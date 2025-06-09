@@ -1,5 +1,5 @@
-#include "types.c"
-#include "os_linux_amd64.c"
+#include "core/include.h"
+
 #include "crc.c"
 
 uint main(uint argc, u8** argv, u8** envp) {
@@ -28,7 +28,7 @@ uint main(uint argc, u8** argv, u8** envp) {
         RetRead r = os_linux_read(o.fd, buf);
         crc = crc_digest(crc, span_u8_slice_head(buf, r.count));
         if (r.code != 0) {
-            if (r.code == ERROR_READ_EOF) {
+            if (r.code == ERROR_READER_EOF) {
                 break;
             }
             return r.code;
