@@ -163,6 +163,71 @@ vulkan_create_surface(EngineHarness* h) {
 }
 
 static void
+vulkan_create_logical_device(EngineHarness* h) {
+    f32 queue_priority = 1.0f;
+
+    vk_DeviceQueueCreateInfo queue_create_infos[1] = {};
+
+    queue_create_infos[0].type = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queue_create_infos[0].queue_family_index = h->vk.graphics_queue_family;
+    queue_create_infos[0].queue_count = 1;
+    queue_create_infos[0].queue_priorities = &queue_priority;
+
+    // TODO: optional present queue?
+
+    // Create logical device from physical device
+    // Note: there are separate instance and device extensions!
+    vk_DeviceCreateInfo device_create_info = {};
+    device_create_info.type = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    device_create_info.queue_create_infos = queue_create_infos;
+    device_create_info.queue_create_info_count = 1;
+
+    // Necessary for shader (for some reason)
+    vk_PhysicalDeviceFeatures enabled_features = {};
+    enabled_features.shader_clip_distance = 1;
+    enabled_features.shader_cull_distance = 1;
+
+    str swapchain_extension_name = ss("VK_KHR_swapchain");
+    const u8* device_extensions[] = {swapchain_extension_name.ptr};
+    device_create_info.enabled_extension_count = array_len(device_extensions);
+    device_create_info.enabled_extension_names = device_extensions;
+    device_create_info.enabled_features = &enabled_features;
+
+    // if (ENABLE_DEBUGGING) {
+    //     device_create_info.enabledLayerCount = 1;
+    //     device_create_info.ppEnabledLayerNames = &DEBUG_LAYER;
+    // }
+
+    vk_Result r = vk_create_device(h->vk.physical_device, &device_create_info, nil, &h->vk.device);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("create vulkan logical device"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+
+    // Get graphics and presentation queues (which may be the same)
+    vk_get_device_queue(h->vk.device, h->vk.graphics_queue_family, 0, &h->vk.graphics_queue);
+
+    // std::cout << "acquired graphics and presentation queues" << std::endl;
+
+    // vkGetPhysicalDeviceMemoryProperties(physicalDevice, &deviceMemoryProperties);
+}
+
+static void
+vulkan_create_command_pool(EngineHarness* h) {
+    vk_CommandPoolCreateInfo pool_create_info = {};
+    pool_create_info.type = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    pool_create_info.queue_family_index = h->vk.graphics_queue_family;
+
+    vk_Result r = vk_create_command_pool(h->vk.device, &pool_create_info, nil, &h->vk.command_pool);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("create vulkan command pool"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+}
+
+static void
 init_renderer(EngineHarness* h) {
     vulkan_create_instance(h);
     if (h->exit) {
@@ -185,6 +250,11 @@ init_renderer(EngineHarness* h) {
     }
 
     vulkan_create_surface(h);
+    if (h->exit) {
+        return;
+    }
+
+    vulkan_create_logical_device(h);
     if (h->exit) {
         return;
     }

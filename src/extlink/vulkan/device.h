@@ -26,7 +26,7 @@ typedef struct {
     vk_Bool32    fullDrawIndexUint32;
     vk_Bool32    imageCubeArray;
     vk_Bool32    independentBlend;
-    vk_Bool32    geometryShader;
+    vk_Bool32    geometry_shader;
     vk_Bool32    tessellationShader;
     vk_Bool32    sampleRateShading;
     vk_Bool32    dualSrcBlend;
@@ -59,11 +59,11 @@ typedef struct {
     vk_Bool32    shaderSampledImageArrayDynamicIndexing;
     vk_Bool32    shaderStorageBufferArrayDynamicIndexing;
     vk_Bool32    shaderStorageImageArrayDynamicIndexing;
-    vk_Bool32    shaderClipDistance;
-    vk_Bool32    shaderCullDistance;
-    vk_Bool32    shaderFloat64;
-    vk_Bool32    shaderInt64;
-    vk_Bool32    shaderInt16;
+    vk_Bool32    shader_clip_distance;
+    vk_Bool32    shader_cull_distance;
+    vk_Bool32    shader_f64;
+    vk_Bool32    shader_s64;
+    vk_Bool32    shader_s16;
     vk_Bool32    shaderResourceResidency;
     vk_Bool32    shaderResourceMinLod;
     vk_Bool32    sparseBinding;
@@ -145,7 +145,7 @@ vkCreateDevice(
     vk_Device*                                  device
 );
 
-static vk_Result // linkname
+static vk_Result
 vk_create_device(
     vk_PhysicalDevice                           physical_device,
     const vk_DeviceCreateInfo*                  create_info,
@@ -153,4 +153,22 @@ vk_create_device(
     vk_Device*                                  device
 ) {
     return vkCreateDevice(physical_device, create_info, allocator, device);
+}
+
+void // linkname
+vkGetDeviceQueue(
+    vk_Device                                    device,
+    u32                                          queue_family_index,
+    u32                                          queue_index,
+    vk_Queue*                                    queue
+);
+
+static void
+vk_get_device_queue(
+    vk_Device                                    device,
+    u32                                          queue_family_index,
+    u32                                          queue_index,
+    vk_Queue*                                    queue
+) {
+    vkGetDeviceQueue(device, queue_family_index, queue_index, queue);
 }

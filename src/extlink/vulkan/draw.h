@@ -573,3 +573,22 @@ typedef struct {
     u32                               dependency_count;
     const VkSubpassDependency*        dependencies;
 } vk_RenderPassCreateInfo;
+
+vk_Result // linkname
+vkCreateCommandPool(
+    vk_Device                                   device,
+    const vk_CommandPoolCreateInfo*             create_info,
+    /* const VkAllocationCallbacks* */ void*    allocator,
+    vk_CommandPool*                             command_pool
+);
+
+
+static vk_Result
+vk_create_command_pool(
+    vk_Device                                   device,
+    const vk_CommandPoolCreateInfo*             create_info,
+    /* const VkAllocationCallbacks* */ void*    allocator,
+    vk_CommandPool*                             command_pool
+) {
+    return vkCreateCommandPool(device, create_info, allocator, command_pool);
+}

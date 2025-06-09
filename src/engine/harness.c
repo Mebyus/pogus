@@ -7,6 +7,9 @@
 typedef struct {
     vk_Instance       instance;
     vk_PhysicalDevice physical_device;
+    vk_Device         device;
+    vk_Queue          graphics_queue;
+    vk_CommandPool    command_pool;
     vk_SurfaceKHR     surface;
 
     u32 graphics_queue_family;
