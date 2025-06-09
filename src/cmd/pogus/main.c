@@ -2,7 +2,8 @@
 
 #include "link_libc.h"
 #include "os_linux_log.c"
-#include "window_linux.c"
+
+#include "engine/include.h"
 
 static void
 run_main_loop(EngineHarness* h) {
