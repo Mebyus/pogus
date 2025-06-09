@@ -5,8 +5,8 @@
     #root main_hash.c
 }
 
-#build game {
-    #root main_window.c
+#build pogus {
+    #root cmd/pogus/main.c
     
     #link xcb
     #link vulkan
