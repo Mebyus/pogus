@@ -5,12 +5,24 @@
 #define ENGINE_EXIT_ERROR_INIT 1
 
 typedef struct {
+    vk_PhysicalDeviceMemoryProperties memory_properties;
+
     vk_Instance       instance;
     vk_PhysicalDevice physical_device;
     vk_Device         device;
     vk_Queue          graphics_queue;
     vk_CommandPool    command_pool;
     vk_SurfaceKHR     surface;
+    // vk_Framebuffer    framebuffer;
+
+    vk_Semaphore  image_available_semaphore;
+    vk_Semaphore  rendering_finished_semaphore;
+
+    vk_Buffer       vertex_buffer;
+	vk_DeviceMemory vertex_buffer_memory;
+	
+    vk_Buffer       index_buffer;
+	vk_DeviceMemory index_buffer_memory;
 
     u32 graphics_queue_family;
 } VulkanContext;

@@ -25,6 +25,9 @@ typedef enum {
     VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO = 2,
     VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO = 3,
 
+    VK_STRUCTURE_TYPE_FENCE_CREATE_INFO = 8,
+    VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO = 9,
+
     VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO = 37,
     VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO = 38,
     VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO = 39,
@@ -39,7 +42,11 @@ typedef struct vk_ObjectSurfaceKHR*      vk_SurfaceKHR;
 typedef struct vk_ObjectDevice*          vk_Device;
 typedef struct vk_ObjectCommandPool*     vk_CommandPool;
 typedef struct vk_ObjectQueue*           vk_Queue;
-typedef struct vk_ObjectCommandPool*     vk_CommandPool;
+typedef struct vk_ObjectSemaphore*       vk_Semaphore;
+typedef struct vk_ObjectCommandBuffer*   vk_CommandBuffer;
+typedef struct vk_ObjectBuffer*          vk_Buffer;
+typedef struct vk_ObjectDeviceMemory*    vk_DeviceMemory;
+typedef struct vk_ObjectFramebuffer*     vk_Framebuffer;  
 /* =================== */
 
 typedef struct {

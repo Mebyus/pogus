@@ -520,7 +520,7 @@ typedef struct {
 } vk_CommandBufferAllocateInfo;
 
 typedef struct {
-    u32    flags;
+    u32                              flags;
     vk_Format                        format;
     vk_SampleCountFlagBits           samples;
     vk_AttachmentLoadOp              load_op;
@@ -560,19 +560,49 @@ typedef struct {
     u32  dst_access_mask;
 
     u32  dependency_flags;
-} VkSubpassDependency;
+} vk_SubpassDependency;
 
 typedef struct {
     vk_StructureType                  type;
     const void*                       next;
     u32                               flags;
     u32                               attachment_count;
-    const vk_AttachmentDescription*    attachments;
+    const vk_AttachmentDescription*   attachments;
     u32                               subpass_count;
-    const vk_SubpassDescription*       subpasses;
+    const vk_SubpassDescription*      subpasses;
     u32                               dependency_count;
-    const VkSubpassDependency*        dependencies;
+    const vk_SubpassDependency*       dependencies;
 } vk_RenderPassCreateInfo;
+
+typedef struct {
+    vk_StructureType               type;
+    const void*                    next;
+    u32                            wait_semaphore_count;
+    const vk_Semaphore*            wait_semaphores;
+    const u32*                     wait_destination_stage_mask;
+    u32                            command_buffer_count;
+    const vk_CommandBuffer*        command_buffers;
+    u32                            signal_semaphore_count;
+    const vk_Semaphore*            signal_semaphores;
+} vk_SubmitInfo;
+
+typedef struct {
+    vk_StructureType   type;
+    const void*        next;
+    vk_RenderPass      render_pass;
+    u32                subpass;
+    vk_Framebuffer     framebuffer;
+    vk_Bool32          occlusion_query_enable;
+    u32                query_flags;
+    u32                pipeline_statistics;
+} vk_CommandBufferInheritanceInfo;
+
+typedef struct {
+    vk_StructureType                         type;
+    const void*                              next;
+    u32                                      flags;
+    const vk_CommandBufferInheritanceInfo*   inheritance_info;
+} VkCommandBufferBeginInfo;
 
 vk_Result // linkname
 vkCreateCommandPool(
@@ -591,4 +621,38 @@ vk_create_command_pool(
     vk_CommandPool*                             command_pool
 ) {
     return vkCreateCommandPool(device, create_info, allocator, command_pool);
+}
+
+vk_Result // linkname
+vkAllocateCommandBuffers(
+    vk_Device                                    device,
+    const vk_CommandBufferAllocateInfo*          allocate_info,
+    vk_CommandBuffer*                            command_buffers
+);
+
+static vk_Result
+vk_allocate_command_buffers(
+    vk_Device                                    device,
+    const vk_CommandBufferAllocateInfo*          allocate_info,
+    vk_CommandBuffer*                            command_buffers
+) {
+    return vkAllocateCommandBuffers(device, allocate_info, command_buffers);
+}
+
+VkResult // linkname
+vkCreateBuffer(
+    vk_Device                                    device,
+    const vk_BufferCreateInfo*                   create_info,
+    /* const vk_AllocationCallbacks* */ void*    allocator,
+    vk_Buffer*                                   buffer
+);
+
+static VkResult
+vk_create_buffer(
+    vk_Device                                    device,
+    const vk_BufferCreateInfo*                   create_info,
+    /* const vk_AllocationCallbacks* */ void*    allocator,
+    vk_Buffer*                                   buffer
+) {
+    return vkCreateBuffer(device, create_info, allocator, buffer);
 }
