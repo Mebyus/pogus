@@ -208,9 +208,7 @@ vulkan_create_logical_device(EngineHarness* h) {
     // Get graphics and presentation queues (which may be the same)
     vk_get_device_queue(h->vk.device, h->vk.graphics_queue_family, 0, &h->vk.graphics_queue);
 
-    // std::cout << "acquired graphics and presentation queues" << std::endl;
-
-    // vkGetPhysicalDeviceMemoryProperties(physicalDevice, &deviceMemoryProperties);
+    vk_get_physical_device_memory_properties(h->vk.physical_device, &h->vk.memory_properties);
 }
 
 static void
@@ -258,9 +256,9 @@ static RetDeviceMemoryType
 vulkan_find_device_memory_type(vk_PhysicalDeviceMemoryProperties* p, u32 type_bits, u32 property_flags) {
     RetDeviceMemoryType ret = {};
 
-    for (u32 i = 0; i < p.memory_type_count; i += 1) {
+    for (u32 i = 0; i < p->memory_type_count; i += 1) {
         if ((type_bits & 1) == 1) {
-            if ((p.memory_types[i].property_flags & property_flags) == property_flags) {
+            if ((p->memory_types[i].property_flags & property_flags) == property_flags) {
                 ret.index = i;
                 return ret;
             }
@@ -284,19 +282,17 @@ typedef	struct {
 
 static void
 vulkan_create_vertex_buffer(EngineHarness* h) {
-    		// Setup vertices
-		std::vector<Vertex> vertices = {
-			{ { -0.5f, -0.5f,  0.0f }, { 1.0f, 0.0f, 0.0f } },
-			{ { -0.5f,  0.5f,  0.0f }, { 0.0f, 1.0f, 0.0f } },
-			{ {  0.5f,  0.5f,  0.0f }, { 0.0f, 0.0f, 1.0f } }
-		};
-		uint32_t verticesSize = (uint32_t) (vertices.size() * sizeof(vertices[0]));
+    f32 vertices[6][3] = {
+        { -0.5f, -0.5f,  0.0f }, { 1.0f, 0.0f, 0.0f },
+        { -0.5f,  0.5f,  0.0f }, { 0.0f, 1.0f, 0.0f },
+        {  0.5f,  0.5f,  0.0f }, { 0.0f, 0.0f, 1.0f }
+    };
+    u32 vertices_size = cast(u32, sizeof(vertices));
 
-		// Setup indices
-		std::vector<uint32_t> indices = { 0, 1, 2 };
-		uint32_t indicesSize = (uint32_t) (indices.size() * sizeof(indices[0]));
+    u32 indices[] = { 0, 1, 2 };
+    u32 indices_size = cast(u32, sizeof(indices));
 
-		void* data;
+    void* data;
 
     // Allocate command buffer for copy operation
     vk_CommandBufferAllocateInfo command_buffer_info = {};
@@ -316,7 +312,7 @@ vulkan_create_vertex_buffer(EngineHarness* h) {
     // First copy vertices to host accessible vertex buffer memory
     vk_BufferCreateInfo vertex_buffer_info = {};
     vertex_buffer_info.type = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    vertex_buffer_info.size = verticesSize;
+    vertex_buffer_info.size = vertices_size;
     vertex_buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
 	StagingBuffers staging_buffers;
@@ -336,7 +332,7 @@ vulkan_create_vertex_buffer(EngineHarness* h) {
 		
     RetDeviceMemoryType ret_mem = vulkan_find_device_memory_type(&h->vk.memory_properties, memory_requirements.memory_type_bits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
     if (ret_mem.code != 0) {
-        log_error_field(&h->lg, ss("find suitable device memory type"), log_field_u64(s("type"), memory_requirements.memory_type_bits));
+        log_error_field(&h->lg, ss("find suitable device memory type"), log_field_u64(ss("type"), memory_requirements.memory_type_bits));
         engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
         return;
     }
@@ -349,94 +345,197 @@ vulkan_create_vertex_buffer(EngineHarness* h) {
         return;
     }
 
-		vkMapMemory(h->vk.device, staging_buffers.vertices.memory, 0, verticesSize, 0, &data);
-		memcpy(data, vertices.data(), verticesSize);
-		vkUnmapMemory(h->vk.device, staging_buffers.vertices.memory);
-		vkBindBufferMemory(h->vk.device, staging_buffers.vertices.buffer, staging_buffers.vertices.memory, 0);
+    r = vk_map_memory(h->vk.device, staging_buffers.vertices.memory, 0, vertices_size, 0, &data);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("map vertices data from memory"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
 
-		// Then allocate a gpu only buffer for vertices
-		vertex_buffer_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-		vkCreateBuffer(h->vk.device, &vertex_buffer_info, nil, &vertexBuffer);
-		vk_get_buffer_memory_requirements(h->vk.device, vertexBuffer, &memory_requirements);
-		mem_allocate_info.allocationSize = memory_requirements.size;
-		getMemoryType(memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &mem_allocate_info.memoryTypeIndex);
-		vk_allocate_memory(h->vk.device, &mem_allocate_info, nil, &vertexBufferMemory);
-		vkBindBufferMemory(h->vk.device, vertexBuffer, vertexBufferMemory, 0);
+    unsafe_copy(data, cast(void*, vertices), vertices_size);
+    vk_unmap_memory(h->vk.device, staging_buffers.vertices.memory);
 
-		// Next copy indices to host accessible index buffer memory
-		vk_BufferCreateInfo index_buffer_info = {};
-		index_buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		index_buffer_info.size = indicesSize;
-		index_buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    r = vk_bind_buffer_memory(h->vk.device, staging_buffers.vertices.buffer, staging_buffers.vertices.memory, 0);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("bind vertices buffer memory"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
 
-		vkCreateBuffer(h->vk.device, &index_buffer_info, nil, &staging_buffers.indices.buffer);
-		vk_get_buffer_memory_requirements(h->vk.device, staging_buffers.indices.buffer, &memory_requirements);
-		mem_allocate_info.allocationSize = memory_requirements.size;
-		getMemoryType(memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &mem_allocate_info.memoryTypeIndex);
-		vk_allocate_memory(h->vk.device, &mem_allocate_info, nil, &staging_buffers.indices.memory);
-		vkMapMemory(h->vk.device, staging_buffers.indices.memory, 0, indicesSize, 0, &data);
-		memcpy(data, indices.data(), indicesSize);
-		vkUnmapMemory(h->vk.device, staging_buffers.indices.memory);
-		vkBindBufferMemory(h->vk.device, staging_buffers.indices.buffer, staging_buffers.indices.memory, 0);
+    // Then allocate a gpu only buffer for vertices
+    vertex_buffer_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    r = vk_create_buffer(h->vk.device, &vertex_buffer_info, nil, &h->vk.vertex_buffer);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("create gpu-only vertices buffer"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
 
-		// And allocate another gpu only buffer for indices
-		index_buffer_info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-		vk_create_buffer(h->vk.device, &index_buffer_info, nil, &indexBuffer);
-		vk_get_buffer_memory_requirements(h->vk.device, indexBuffer, &memory_requirements);
-		mem_allocate_info.allocationSize = memory_requirements.size;
-		getMemoryType(memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &mem_allocate_info.memoryTypeIndex);
-		vk_allocate_memory(h->vk.device, &mem_allocate_info, nil, &indexBufferMemory);
-		vkBindBufferMemory(h->vk.device, indexBuffer, indexBufferMemory, 0);
-
-		// Now copy data from host visible buffer to gpu only buffer
-		VkCommandBufferBeginInfo bufferBeginInfo = {};
-		bufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		bufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-		vkBeginCommandBuffer(copy_command_buffer, &bufferBeginInfo);
-
-		vk_BufferCopy copy_region = {};
-		copy_region.size = verticesSize;
-		vkCmdCopyBuffer(copy_command_buffer, staging_buffers.vertices.buffer, h->vk.vertex_buffer, 1, &copy_region);
-		copy_region.size = indicesSize;
-		vkCmdCopyBuffer(copy_command_buffer, staging_buffers.indices.buffer, h->vk.index_buffer, 1, &copy_region);
-
-		vkEndCommandBuffer(copy_command_buffer);
-
-		// Submit to queue
-		vk_SubmitInfo submit_info = {};
-		submit_info.type = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		submit_info.command_buffer_count = 1;
-		submit_info.command_buffers = &copy_command_buffer;
-
-		vk_queue_submit(h->vk.graphics_queue, 1, &submit_info, nil);
-		vkQueueWaitIdle(h->vk.graphics_queue);
-
-		vkFreeCommandBuffers(h->vk.device, h->vk.command_pool, 1, &copy_command_buffer);
-
-		vkDestroyBuffer(h->vk.device, staging_buffers.vertices.buffer, nil);
-		vk_free_memory(h->vk.device, staging_buffers.vertices.memory, nil);
-		vkDestroyBuffer(h->vk.device, staging_buffers.indices.buffer, nil);
-		vk_free_memory(h->vk.device, staging_buffers.indices.memory, nil);
-
-		std::cout << "set up vertex and index buffers" << std::endl;
-
-		// Binding and attribute descriptions
-		vertexBindingDescription.binding = 0;
-		vertexBindingDescription.stride = sizeof(vertices[0]);
-		vertexBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-		// vec2 position
-		vertexAttributeDescriptions.resize(2);
-		vertexAttributeDescriptions[0].binding = 0;
-		vertexAttributeDescriptions[0].location = 0;
-		vertexAttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    vk_get_buffer_memory_requirements(h->vk.device, h->vk.vertex_buffer, &memory_requirements);
 		
-		// vec3 color
-		vertexAttributeDescriptions[1].binding = 0;
-		vertexAttributeDescriptions[1].location = 1;
-		vertexAttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-		vertexAttributeDescriptions[1].offset = sizeof(float) * 3;
+    mem_allocate_info.allocation_size = memory_requirements.size;
+    ret_mem = vulkan_find_device_memory_type(&h->vk.memory_properties, memory_requirements.memory_type_bits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    if (ret_mem.code != 0) {
+        log_error_field(&h->lg, ss("find (2) suitable device memory type"), log_field_u64(ss("type"), memory_requirements.memory_type_bits));
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+    mem_allocate_info.memory_type_index = ret_mem.index;
+	
+    r = vk_allocate_memory(h->vk.device, &mem_allocate_info, nil, &h->vk.vertex_buffer_memory);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("allocate (2) vertices buffer memory"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+
+    r = vk_bind_buffer_memory(h->vk.device, h->vk.vertex_buffer, h->vk.vertex_buffer_memory, 0);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("bind (2) vertices buffer memory"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+
+    // Next copy indices to host accessible index buffer memory
+    vk_BufferCreateInfo index_buffer_info = {};
+    index_buffer_info.type = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    index_buffer_info.size = indices_size;
+    index_buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    r = vk_create_buffer(h->vk.device, &index_buffer_info, nil, &staging_buffers.indices.buffer);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("create index buffer"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+		
+    vk_get_buffer_memory_requirements(h->vk.device, staging_buffers.indices.buffer, &memory_requirements);
+
+    mem_allocate_info.allocation_size = memory_requirements.size;	
+    ret_mem = vulkan_find_device_memory_type(&h->vk.memory_properties, memory_requirements.memory_type_bits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    if (ret_mem.code != 0) {
+        log_error_field(&h->lg, ss("find (3) suitable device memory type"), log_field_u64(ss("type"), memory_requirements.memory_type_bits));
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+    mem_allocate_info.memory_type_index = ret_mem.index;
+		
+    r = vk_allocate_memory(h->vk.device, &mem_allocate_info, nil, &staging_buffers.indices.memory);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("allocate indices buffer memory"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+
+    r = vk_map_memory(h->vk.device, staging_buffers.indices.memory, 0, indices_size, 0, &data);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("map indices data from memory"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+
+    unsafe_copy(data, cast(void*, indices), indices_size);
+    vk_unmap_memory(h->vk.device, staging_buffers.indices.memory);
+
+    r = vk_bind_buffer_memory(h->vk.device, staging_buffers.indices.buffer, staging_buffers.indices.memory, 0);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("bind indices buffer memory"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+
+    // And allocate another gpu only buffer for indices
+    index_buffer_info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    r = vk_create_buffer(h->vk.device, &index_buffer_info, nil, &h->vk.index_buffer);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("create gpu-only index buffer"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+
+    vk_get_buffer_memory_requirements(h->vk.device, h->vk.index_buffer, &memory_requirements);
+		
+    mem_allocate_info.allocation_size = memory_requirements.size;
+	ret_mem = vulkan_find_device_memory_type(&h->vk.memory_properties, memory_requirements.memory_type_bits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    if (ret_mem.code != 0) {
+        log_error_field(&h->lg, ss("find (4) suitable device memory type"), log_field_u64(ss("type"), memory_requirements.memory_type_bits));
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+    mem_allocate_info.memory_type_index = ret_mem.index;
+		
+    r = vk_allocate_memory(h->vk.device, &mem_allocate_info, nil, &h->vk.index_buffer_memory);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("allocate indices buffer memory"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+    r = vk_bind_buffer_memory(h->vk.device, h->vk.index_buffer, h->vk.index_buffer_memory, 0);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("bind (2) indices buffer memory"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+
+    // Now copy data from host visible buffer to gpu only buffer
+    vk_CommandBufferBeginInfo buffer_begin_info = {};
+    buffer_begin_info.type = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    r = vk_begin_command_buffer(copy_command_buffer, &buffer_begin_info);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("begin command buffer"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+
+    vk_BufferCopy copy_region = {};
+    copy_region.size = vertices_size;
+    vk_command_copy_buffer(copy_command_buffer, staging_buffers.vertices.buffer, h->vk.vertex_buffer, 1, &copy_region);
+		
+    copy_region.size = indices_size;
+    vk_command_copy_buffer(copy_command_buffer, staging_buffers.indices.buffer, h->vk.index_buffer, 1, &copy_region);
+
+	r = vk_end_command_buffer(copy_command_buffer);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("end command buffer"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+
+    vk_SubmitInfo submit_info = {};
+    submit_info.type = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.command_buffer_count = 1;
+    submit_info.command_buffers = &copy_command_buffer;
+
+    r = vk_queue_submit(h->vk.graphics_queue, 1, &submit_info, nil);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("submit queue"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+
+    vk_queue_wait_idle(h->vk.graphics_queue);
+
+    vk_free_command_buffers(h->vk.device, h->vk.command_pool, 1, &copy_command_buffer);
+    vk_destroy_buffer(h->vk.device, staging_buffers.vertices.buffer, nil);
+    vk_free_memory(h->vk.device, staging_buffers.vertices.memory, nil);
+    vk_destroy_buffer(h->vk.device, staging_buffers.indices.buffer, nil);
+    vk_free_memory(h->vk.device, staging_buffers.indices.memory, nil);
+
+
+    h->vk.vertex_binding_description.binding = 0;
+    h->vk.vertex_binding_description.stride = sizeof(vertices[0]);
+    h->vk.vertex_binding_description.input_rate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    // vec2 position
+    h->vk.vertex_attribute_descriptions[0].binding = 0;
+    h->vk.vertex_attribute_descriptions[0].location = 0;
+    h->vk.vertex_attribute_descriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+        
+    // vec3 color
+    h->vk.vertex_attribute_descriptions[1].binding = 0;
+    h->vk.vertex_attribute_descriptions[1].location = 1;
+    h->vk.vertex_attribute_descriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+    h->vk.vertex_attribute_descriptions[1].offset = sizeof(f32) * 3;
 }
 
 static void
@@ -472,6 +571,11 @@ init_renderer(EngineHarness* h) {
     }
 
     vulkan_create_semaphores(h);
+    if (h->exit) {
+        return;
+    }
+
+    vulkan_create_command_pool(h);
     if (h->exit) {
         return;
     }

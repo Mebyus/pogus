@@ -24,6 +24,9 @@ typedef struct {
     vk_Buffer       index_buffer;
 	vk_DeviceMemory index_buffer_memory;
 
+    vk_VertexInputBindingDescription    vertex_binding_description;
+    vk_VertexInputAttributeDescription  vertex_attribute_descriptions[2];
+
     u32 graphics_queue_family;
 } VulkanContext;
 

@@ -1,3 +1,21 @@
+typedef enum {
+    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT = 0x00000001,
+    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT = 0x00000002,
+    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT = 0x00000004,
+    VK_MEMORY_PROPERTY_HOST_CACHED_BIT = 0x00000008,
+    VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT = 0x00000010,
+    VK_MEMORY_PROPERTY_PROTECTED_BIT = 0x00000020,
+    VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD = 0x00000040,
+    VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD = 0x00000080,
+    VK_MEMORY_PROPERTY_RDMA_CAPABLE_BIT_NV = 0x00000100,
+    VK_MEMORY_PROPERTY_FLAG_BITS_MAX_ENUM = 0x7FFFFFFF
+} vk_MemoryPropertyFlagBits;
+
+typedef enum {
+    VK_MEMORY_MAP_PLACED_BIT_EXT = 0x00000001,
+    VK_MEMORY_MAP_FLAG_BITS_MAX_ENUM = 0x7FFFFFFF
+} vk_MemoryMapFlagBits;
+
 typedef struct {
     vk_StructureType type;
     const void*      next;
@@ -43,6 +61,20 @@ typedef struct {
     vk_DeviceSize   size;
 } vk_BufferCopy;
 
+void // linkname
+vkGetPhysicalDeviceMemoryProperties(
+    vk_PhysicalDevice                    physical_device,
+    vk_PhysicalDeviceMemoryProperties*   memory_properties
+);
+
+static void
+vk_get_physical_device_memory_properties(
+    vk_PhysicalDevice                    physical_device,
+    vk_PhysicalDeviceMemoryProperties*   memory_properties
+) {
+    vkGetPhysicalDeviceMemoryProperties(physical_device, memory_properties);
+}
+
 vk_Result // linkname
 vkCreateSemaphore(
     vk_Device                                    device,
@@ -73,9 +105,11 @@ vk_get_buffer_memory_requirements(
     vk_Device                                    device,
     vk_Buffer                                    buffer,
     vk_MemoryRequirements*                       memory_requirements
-);
+) {
+    vkGetBufferMemoryRequirements(device, buffer, memory_requirements);
+}
 
-VkResult // linkname
+vk_Result // linkname
 vkAllocateMemory(
     vk_Device                                   device,
     const vk_MemoryAllocateInfo*                allocate_info,
@@ -83,8 +117,7 @@ vkAllocateMemory(
     vk_DeviceMemory*                            memory
 );
 
-
-static VkResult
+static vk_Result
 vk_allocate_memory(
     vk_Device                                   device,
     const vk_MemoryAllocateInfo*                allocate_info,
@@ -101,7 +134,6 @@ vkFreeMemory(
     /* const VkAllocationCallbacks* */ void*  allocator
 );
 
-
 static void
 vk_free_memory(
     vk_Device                                 device,
@@ -111,3 +143,32 @@ vk_free_memory(
     vkFreeMemory(device, memory, allocator);
 }
 
+vk_Result // linkname
+vkMapMemory(
+    vk_Device          device,
+    vk_DeviceMemory    memory,
+    vk_DeviceSize      offset,
+    vk_DeviceSize      size,
+    u32                flags,
+    void**             data
+);
+
+static vk_Result
+vk_map_memory(
+    vk_Device          device,
+    vk_DeviceMemory    memory,
+    vk_DeviceSize      offset,
+    vk_DeviceSize      size,
+    u32                flags,
+    void**             data   // out
+) {
+    return vkMapMemory(device, memory, offset, size, flags, data);
+}
+
+void // linkname
+vkUnmapMemory(vk_Device device, vk_DeviceMemory memory);
+
+static void
+vk_unmap_memory(vk_Device device, vk_DeviceMemory memory) {
+    vkUnmapMemory(device, memory);
+}

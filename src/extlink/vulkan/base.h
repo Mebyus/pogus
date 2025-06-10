@@ -24,13 +24,24 @@ typedef enum {
     VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO = 1,
     VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO = 2,
     VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO = 3,
+    VK_STRUCTURE_TYPE_SUBMIT_INFO = 4,
+    VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO = 5,
 
     VK_STRUCTURE_TYPE_FENCE_CREATE_INFO = 8,
     VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO = 9,
 
+    VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO = 12,
+
     VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO = 37,
     VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO = 38,
     VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO = 39,
+    VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO = 40,
+    VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO = 41,
+    VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO = 42,
+    VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO = 43,
+    VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER = 44,
+    VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER = 45,
+    VK_STRUCTURE_TYPE_MEMORY_BARRIER = 46,
 
     VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR = 1000005000,
 } vk_StructureType;
@@ -43,10 +54,12 @@ typedef struct vk_ObjectDevice*          vk_Device;
 typedef struct vk_ObjectCommandPool*     vk_CommandPool;
 typedef struct vk_ObjectQueue*           vk_Queue;
 typedef struct vk_ObjectSemaphore*       vk_Semaphore;
+typedef struct vk_ObjectFence*           vk_Fence;
 typedef struct vk_ObjectCommandBuffer*   vk_CommandBuffer;
 typedef struct vk_ObjectBuffer*          vk_Buffer;
 typedef struct vk_ObjectDeviceMemory*    vk_DeviceMemory;
 typedef struct vk_ObjectFramebuffer*     vk_Framebuffer;  
+typedef struct vk_ObjectRenderPass*      vk_RenderPass;
 /* =================== */
 
 typedef struct {

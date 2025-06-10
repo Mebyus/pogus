@@ -468,6 +468,56 @@ typedef enum {
     VK_PIPELINE_BIND_POINT_MAX_ENUM = 0x7FFFFFFF
 } vk_PipelineBindPoint;
 
+typedef enum {
+    VK_BUFFER_USAGE_TRANSFER_SRC_BIT = 0x00000001,
+    VK_BUFFER_USAGE_TRANSFER_DST_BIT = 0x00000002,
+    VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT = 0x00000004,
+    VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT = 0x00000008,
+    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT = 0x00000010,
+    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT = 0x00000020,
+    VK_BUFFER_USAGE_INDEX_BUFFER_BIT = 0x00000040,
+    VK_BUFFER_USAGE_VERTEX_BUFFER_BIT = 0x00000080,
+    VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT = 0x00000100,
+    VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT = 0x00020000,
+    VK_BUFFER_USAGE_VIDEO_DECODE_SRC_BIT_KHR = 0x00002000,
+    VK_BUFFER_USAGE_VIDEO_DECODE_DST_BIT_KHR = 0x00004000,
+    VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT = 0x00000800,
+    VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_COUNTER_BUFFER_BIT_EXT = 0x00001000,
+    VK_BUFFER_USAGE_CONDITIONAL_RENDERING_BIT_EXT = 0x00000200,
+
+    // beta extension
+    VK_BUFFER_USAGE_EXECUTION_GRAPH_SCRATCH_BIT_AMDX = 0x02000000,
+
+    VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR = 0x00080000,
+    VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR = 0x00100000,
+    VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR = 0x00000400,
+    VK_BUFFER_USAGE_VIDEO_ENCODE_DST_BIT_KHR = 0x00008000,
+    VK_BUFFER_USAGE_VIDEO_ENCODE_SRC_BIT_KHR = 0x00010000,
+    VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT = 0x00200000,
+    VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT = 0x00400000,
+    VK_BUFFER_USAGE_PUSH_DESCRIPTORS_DESCRIPTOR_BUFFER_BIT_EXT = 0x04000000,
+    VK_BUFFER_USAGE_MICROMAP_BUILD_INPUT_READ_ONLY_BIT_EXT = 0x00800000,
+    VK_BUFFER_USAGE_MICROMAP_STORAGE_BIT_EXT = 0x01000000,
+    VK_BUFFER_USAGE_TILE_MEMORY_QCOM = 0x08000000,
+    VK_BUFFER_USAGE_RAY_TRACING_BIT_NV = VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR,
+    VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_EXT = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+    VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+    VK_BUFFER_USAGE_FLAG_BITS_MAX_ENUM = 0x7FFFFFFF
+} vk_BufferUsageFlagBits;
+
+typedef enum {
+    VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT = 0x00000001,
+    VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT = 0x00000002,
+    VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT = 0x00000004,
+    VK_COMMAND_BUFFER_USAGE_FLAG_BITS_MAX_ENUM = 0x7FFFFFFF
+} vk_CommandBufferUsageFlagBits;
+
+typedef enum {
+    VK_VERTEX_INPUT_RATE_VERTEX = 0,
+    VK_VERTEX_INPUT_RATE_INSTANCE = 1,
+    VK_VERTEX_INPUT_RATE_MAX_ENUM = 0x7FFFFFFF
+} vk_VertexInputRate;
+
 /* Opaque handle types */
 typedef struct vk_ObjectSwapchainKHR* vk_SwapchainKHR;
 /* =================== */
@@ -514,7 +564,7 @@ typedef struct {
 typedef struct {
     vk_StructureType        type;
     const void*             next;
-    vk_CommandPool          command_Pool;
+    vk_CommandPool          command_pool;
     vk_CommandBufferLevel   level;
     u32                     command_buffer_count;
 } vk_CommandBufferAllocateInfo;
@@ -602,7 +652,20 @@ typedef struct {
     const void*                              next;
     u32                                      flags;
     const vk_CommandBufferInheritanceInfo*   inheritance_info;
-} VkCommandBufferBeginInfo;
+} vk_CommandBufferBeginInfo;
+
+typedef struct {
+    u32                   binding;
+    u32                   stride;
+    vk_VertexInputRate    input_rate;
+} vk_VertexInputBindingDescription;
+
+typedef struct {
+    u32        location;
+    u32        binding;
+    vk_Format  format;
+    u32        offset;
+} vk_VertexInputAttributeDescription;
 
 vk_Result // linkname
 vkCreateCommandPool(
@@ -611,7 +674,6 @@ vkCreateCommandPool(
     /* const VkAllocationCallbacks* */ void*    allocator,
     vk_CommandPool*                             command_pool
 );
-
 
 static vk_Result
 vk_create_command_pool(
@@ -639,7 +701,7 @@ vk_allocate_command_buffers(
     return vkAllocateCommandBuffers(device, allocate_info, command_buffers);
 }
 
-VkResult // linkname
+vk_Result // linkname
 vkCreateBuffer(
     vk_Device                                    device,
     const vk_BufferCreateInfo*                   create_info,
@@ -647,7 +709,7 @@ vkCreateBuffer(
     vk_Buffer*                                   buffer
 );
 
-static VkResult
+static vk_Result
 vk_create_buffer(
     vk_Device                                    device,
     const vk_BufferCreateInfo*                   create_info,
@@ -655,4 +717,133 @@ vk_create_buffer(
     vk_Buffer*                                   buffer
 ) {
     return vkCreateBuffer(device, create_info, allocator, buffer);
+}
+
+vk_Result // linkname
+vkQueueWaitIdle(vk_Queue queue);
+
+static vk_Result
+vk_queue_wait_idle(vk_Queue queue) {
+    return vkQueueWaitIdle(queue);
+}
+
+vk_Result // linkname
+vkBeginCommandBuffer(
+    vk_CommandBuffer                   command_buffer,
+    const vk_CommandBufferBeginInfo*   begin_info
+);
+
+static vk_Result
+vk_begin_command_buffer(
+    vk_CommandBuffer                   command_buffer,
+    const vk_CommandBufferBeginInfo*   begin_info
+) {
+    return vkBeginCommandBuffer(command_buffer, begin_info);
+}
+
+vk_Result // linkname
+vkEndCommandBuffer(vk_CommandBuffer command_buffer);
+
+static vk_Result // linkname
+vk_end_command_buffer(vk_CommandBuffer command_buffer) {
+    return vkEndCommandBuffer(command_buffer);
+}
+
+void // linkname
+vkCmdCopyBuffer(
+    vk_CommandBuffer      command_buffer,
+    vk_Buffer             source_buffer,
+    vk_Buffer             destination_buffer,
+    u32                   region_count,
+    const vk_BufferCopy*  regions
+);
+
+static void
+vk_command_copy_buffer(
+    vk_CommandBuffer      command_buffer,
+    vk_Buffer             source_buffer,
+    vk_Buffer             destination_buffer,
+    u32                   region_count,
+    const vk_BufferCopy*  regions
+) {
+    vkCmdCopyBuffer(command_buffer, source_buffer, destination_buffer, region_count, regions);
+}
+
+// VKAPI_ATTR void VKAPI_CALL vkCmdCopyImage(
+//     VkCommandBuffer                             commandBuffer,
+//     VkImage                                     srcImage,
+//     VkImageLayout                               srcImageLayout,
+//     VkImage                                     dstImage,
+//     VkImageLayout                               dstImageLayout,
+//     uint32_t                                    regionCount,
+//     const VkImageCopy*                          pRegions);
+
+vk_Result // linkname
+vkBindBufferMemory(
+    vk_Device         device,
+    vk_Buffer         buffer,
+    vk_DeviceMemory   memory,
+    vk_DeviceSize     memory_offset
+);
+
+static vk_Result
+vk_bind_buffer_memory(
+    vk_Device         device,
+    vk_Buffer         buffer,
+    vk_DeviceMemory   memory,
+    vk_DeviceSize     memory_offset
+) {
+    return vkBindBufferMemory(device, buffer, memory, memory_offset);
+}
+
+vk_Result // linkname
+vkQueueSubmit(
+    vk_Queue              queue,
+    u32                   submit_count,
+    const vk_SubmitInfo*  submits,
+    vk_Fence              fence
+);
+
+static vk_Result
+vk_queue_submit(
+    vk_Queue              queue,
+    u32                   submit_count,
+    const vk_SubmitInfo*  submits,
+    vk_Fence              fence
+) {
+    return vkQueueSubmit(queue, submit_count, submits, fence);
+}
+
+void // linkname
+vkFreeCommandBuffers(
+    vk_Device                device,
+    vk_CommandPool           command_pool,
+    u32                      command_buffer_count,
+    const vk_CommandBuffer*  command_buffers
+);
+
+static void
+vk_free_command_buffers(
+    vk_Device                device,
+    vk_CommandPool           command_pool,
+    u32                      command_buffer_count,
+    const vk_CommandBuffer*  command_buffers
+) {
+    vkFreeCommandBuffers(device, command_pool, command_buffer_count, command_buffers);
+}
+
+void // linkname
+vkDestroyBuffer(
+    vk_Device                                    device,
+    vk_Buffer                                    buffer,
+    /* const VkAllocationCallbacks* */ void*     allocator
+);
+
+static void
+vk_destroy_buffer(
+    vk_Device                                    device,
+    vk_Buffer                                    buffer,
+    /* const VkAllocationCallbacks* */ void*     allocator
+) {
+    vkDestroyBuffer(device, buffer, allocator);
 }
