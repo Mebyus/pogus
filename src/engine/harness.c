@@ -35,7 +35,8 @@ typedef struct {
 Holds together platorm-specific context for running the engine.
 */
 typedef struct {
-    Logger lg;
+    LogSink log_sink;
+    Logger  lg;
 
     VulkanContext vk;
 
@@ -66,7 +67,8 @@ engine_harness_mark_exit(EngineHarness* h, uint code) {
 
 static void
 engine_harness_create_log(EngineHarness* h) {
-    init_log(&h->lg, ss("pogus.log"), LOG_LEVEL_DEBUG);
+    init_log_sink(&h->log_sink, ss("pogus.log"));
+    init_log(&h->lg, &h->log_sink, LOG_LEVEL_DEBUG);
 }
 
 /* Forward declarations of platform stuff */

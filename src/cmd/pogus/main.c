@@ -51,7 +51,7 @@ uint main(uint argc, u8** argv, u8** envp) {
     run_main_loop(&h);
 
     log_exit_code(&h.lg, h.exit_code);
-    log_close(&h.lg);
+    log_sink_close(&h.log_sink);
 
     return h.exit_code;
 }

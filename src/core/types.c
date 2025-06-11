@@ -45,8 +45,11 @@ typedef uint pint;
 // Macro for type cast with fancy syntax.
 #define cast(T, x) (T)(x)
 
-// Shorthand for C string literal to span conversion.
+// Shorthand for C string literal to {str} conversion.
 #define ss(s) make_str((u8*)(u8##s), sizeof(u8##s) - 1)
+
+// Alternative for C string literal to {str} conversion when struct initializer is needed.
+#define sl(s) { .ptr = (u8*)(u8##s), .len = sizeof(u8##s) - 1 }
 
 // Gives number of elements in non-decayed array.
 #define array_len(a) (sizeof(a) / sizeof(*a))
@@ -123,9 +126,15 @@ typedef struct {
 	uint len;
 } span_u8, str, c_string;
 
-static void stdout_write(span_u8 s);
+// Use when you need to explicitly assign empty string.
+static const str
+empty_str = { .ptr = nil, .len = 0 };
 
-static void stderr_write(span_u8 s);
+static void
+stdout_write(span_u8 s);
+
+static void
+stderr_write(span_u8 s);
 
 static void
 print(str s) {

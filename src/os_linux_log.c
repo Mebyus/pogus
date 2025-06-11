@@ -6,6 +6,15 @@
 
 #define LOG_BUFFER_SIZE (1 << 14)
 
+/*/doc
+
+Encapsulates buffered writes to an opened file.
+
+Related:
+    +init_log_sink(...)
+    .log_sink_write(...)
+    .log_sink_flush(...)
+*/
 typedef struct {
     u8 buf[LOG_BUFFER_SIZE];
 
@@ -13,10 +22,219 @@ typedef struct {
     // currently stored in buffer.
     uint pos;
 
+    // File descriptor of log file. Flush is nop if this field is 0.
     uint fd;
+} LogSink;
 
-    u8 level;
-} Logger;
+/*/doc
+
+Init log sink with a given file descriptor. It must be open for writes
+in order for logger to work properly.
+*/
+static void
+init_log_sink_from_fd(LogSink* sink, uint fd) {
+    sink->fd = fd;
+    sink->pos = 0;
+}
+
+static void
+init_log_sink(LogSink* sink, str path) {
+    static_assert(LOG_BUFFER_SIZE >= 1024);
+    must(path.len != 0);
+
+    // This init is needed to setup discard logger when
+    // opening a file fails
+    init_log_sink_from_fd(sink, 0);
+    RetOpen ret = os_create(path);
+    if (ret.code != 0) {
+        return;
+    }
+
+    init_log_sink_from_fd(sink, ret.fd);
+}
+
+static bool
+log_sink_buffer_full(LogSink *sink) {
+    return sink->pos >= LOG_BUFFER_SIZE;
+}
+
+/*/doc
+
+Returns length (in bytes) of buffer tail (unoccupied portion).
+*/
+static uint
+log_sink_buffer_left(LogSink *sink) {
+    return LOG_BUFFER_SIZE - sink->pos;
+}
+
+static span_u8
+log_sink_buffer_tail(LogSink* sink) {
+    return make_span_u8(sink->buf + sink->pos, log_sink_buffer_left(sink));
+}
+
+static span_u8
+log_sink_buffer_head(LogSink* sink) {
+    return make_span_u8(sink->buf, sink->pos);
+}
+
+static void
+log_sink_file_write(LogSink* sink, span_u8 s) {
+    if (sink->fd == 0) {
+        return;
+    }
+
+    os_linux_write_all(sink->fd, s);
+}
+
+static void
+log_sink_file_close(LogSink* sink) {
+    if (sink->fd == 0) {
+        return;
+    }
+    
+    os_linux_amd64_syscall_close(sink->fd);
+}
+
+static void
+log_sink_flush(LogSink* sink) {
+    log_sink_file_write(sink, log_sink_buffer_head(sink));
+    sink->pos = 0;
+}
+
+/*/doc
+
+Flushes log buffer if it is full. Does nothing otherwise.
+*/
+static void
+log_sink_check_flush(LogSink* sink) {
+    if (!log_sink_buffer_full(sink)) {
+        return;
+    }
+    log_sink_flush(sink);
+}
+
+/*/doc
+
+Flushes log buffer if less then specified number of unoccupied bytes left.
+Does nothing otherwise.
+*/
+static void
+log_sink_threshold_flush(LogSink* sink, uint threshold) {
+    if (log_sink_buffer_left(sink) < threshold) {
+        log_sink_flush(sink);
+    }
+}
+
+static void
+log_sink_close(LogSink* sink) {
+    log_sink_flush(sink);
+    log_sink_file_close(sink);
+}
+
+static void
+log_sink_write(LogSink* sink, str s) {
+    if (s.len >= (LOG_BUFFER_SIZE / 2)) {
+        // avoid copies for large strings
+        log_sink_flush(sink);
+        log_sink_file_write(sink, s);
+        return;
+    }
+
+    uint i = 0; // number of bytes from s written
+    while (i < s.len) {
+        log_sink_check_flush(sink);
+
+        span_u8 tail = log_sink_buffer_tail(sink);
+        uint n = copy(tail, str_slice_tail(s, i));
+        i += n;
+        sink->pos += n;
+    }
+}
+
+static void
+log_sink_put_byte(LogSink* sink, u8 b) {
+    log_sink_check_flush(sink);
+
+    span_u8 tail = log_sink_buffer_tail(sink);
+    tail.ptr[0] = b;
+    sink->pos += 1;
+}
+
+static void
+log_sink_put_newline(LogSink* sink) {
+    log_sink_put_byte(sink, '\n');
+}
+
+static void
+log_sink_put_space(LogSink* sink) {
+    log_sink_put_byte(sink, ' ');
+}
+
+static void
+log_sink_format_logger_name(LogSink* sink, str name) {
+    if (name.len == 0) {
+        return;
+    }
+
+    log_sink_put_byte(sink, '(');
+    log_sink_write(sink, name);
+    log_sink_put_byte(sink, ')');
+    log_sink_put_space(sink);
+}
+
+static void
+log_sink_format_dec_u64(LogSink* sink, u64 x) {
+    log_sink_threshold_flush(sink, max_u64_dec_length);
+
+    span_u8 tail = log_sink_buffer_tail(sink);
+    uint n = unsafe_fmt_dec_u64(tail, x);
+    sink->pos += n;
+}
+
+static void
+log_sink_format_dec_s64(LogSink* sink, s64 x) {
+    log_sink_threshold_flush(sink, max_s64_dec_length);
+
+    span_u8 tail = log_sink_buffer_tail(sink);
+    uint n = unsafe_fmt_dec_s64(tail, x);
+    sink->pos += n;
+}
+
+static void
+log_sink_format_str(LogSink* sink, str s) {
+    log_sink_put_byte(sink, '"');
+    log_sink_write(sink, s);
+    log_sink_put_byte(sink, '"');
+}
+
+static void
+log_sink_format_ptr(LogSink* sink, void* ptr) {
+    const uint fmt_ptr_length = 2 + 16; // 0x + hex number
+    log_sink_threshold_flush(sink, fmt_ptr_length);
+
+    span_u8 tail = log_sink_buffer_tail(sink);
+    tail.ptr[0] = '0';
+    tail.ptr[1] = 'x';
+    unsafe_fmt_hex_prefix_zeroes_u64(span_u8_slice_tail(tail, 2), cast(u64, ptr));
+    sink->pos += fmt_ptr_length;
+}
+
+static void
+log_sink_format_span_s64(LogSink* sink, span_s64 s) {
+    log_sink_put_byte(sink, '[');
+    if (s.len == 0) {
+        log_sink_put_byte(sink, ']');
+        return;
+    }
+
+    log_sink_format_dec_s64(sink, s.ptr[0]);
+    for (uint i = 1; i < s.len; i += 1) {
+        log_sink_put_byte(sink, ',');
+        log_sink_put_space(sink);
+        log_sink_format_dec_s64(sink, s.ptr[i]);
+    }
+    log_sink_put_byte(sink, ']');
+}
 
 #define LOG_FIELD_U64 0
 #define LOG_FIELD_S64 1
@@ -41,6 +259,39 @@ typedef struct {
     str name;
     u8  kind;
 } LogField;
+
+static void
+log_sink_format_field_value(LogSink* sink, u8 kind, LogFieldValue value) {
+    switch (kind) {
+    case LOG_FIELD_U64:
+        log_sink_format_dec_u64(sink, value.u64);
+        return;
+    case LOG_FIELD_S64:
+        log_sink_format_dec_s64(sink, value.s64);
+        return;
+    case LOG_FIELD_STR:
+        log_sink_format_str(sink, value.str);
+        return;
+    case LOG_FIELD_PTR:
+        log_sink_format_ptr(sink, value.ptr);
+        return;
+    case LOG_FIELD_SPAN_S64:
+        log_sink_format_span_s64(sink, value.span_s64);
+        return;
+    default:
+        panic_trap();
+    }
+}
+
+static void
+log_sink_format_field(LogSink* sink, LogField field) {
+    log_sink_put_byte(sink, '{');
+    log_sink_write(sink, field.name);
+    log_sink_put_byte(sink, ':');
+    log_sink_put_space(sink);
+    log_sink_format_field_value(sink, field.kind, field.value);
+    log_sink_put_byte(sink, '}');
+}
 
 static LogField
 log_field_u64(str name, u64 value) {
@@ -78,7 +329,6 @@ log_field_ptr(str name, void* value) {
     return field;    
 }
 
-
 static LogField
 log_field_span_s64(str name, span_s64 value) {
     LogField field = {};
@@ -88,247 +338,47 @@ log_field_span_s64(str name, span_s64 value) {
     return field;    
 }
 
-static str
-log_prefix_table[LOG_LEVEL_DEBUG + 1];
+typedef struct {
+    // Short descriptive name of the logger.
+    // It will be automatically added to every log message.
+    str name;
+
+    LogSink* sink;
+
+    u8 level;
+} Logger;
 
 /*/doc
 
-Init logger with a given file descriptor. It must be open for writes
-in order for logger to work properly.
+Do not reorder elements in this array. It is tied to log level constants.
 */
-static void
-init_log_fd(Logger* lg, uint fd, u8 level) {
-    if (log_prefix_table[0].len == 0) {
-        // TODO: make prefix initialization once per program start
-        // properly, without "if" hacks
-        //
-        // This is a hack to initialize table once per program
-        log_prefix_table[LOG_LEVEL_FATAL] = ss("[fatal] ");
-        log_prefix_table[LOG_LEVEL_ERROR] = ss("[error] ");
-        log_prefix_table[LOG_LEVEL_WARN]  = ss(" [warn] ");
-        log_prefix_table[LOG_LEVEL_INFO]  = ss(" [info] ");
-        log_prefix_table[LOG_LEVEL_DEBUG] = ss("[debug] ");
-    }
+static const str
+log_prefix_table[] = {
+    sl("[fatal] "),
+    sl("[error] "),
+    sl(" [warn] "),
+    sl(" [info] "),
+    sl("[debug] "),
+};
 
-    lg->fd = fd;
-    lg->pos = 0;
+static void
+init_log(Logger* lg, LogSink* sink, u8 level) {
+    lg->name = empty_str;
+    lg->sink = sink;
     lg->level = level;
 }
 
-static void
-init_log(Logger* lg, str path, u8 level) {
-    static_assert(LOG_BUFFER_SIZE >= 1024);
-    must(path.len != 0);
-
-    // This init is needed to setup discard logger when
-    // opening a file fails
-    init_log_fd(lg, 0, 0);
-
-    if (path.len >= OS_LINUX_MAX_PATH_LENGTH) {
-        return;
-    }
-
-    u8 path_buf[OS_LINUX_MAX_PATH_LENGTH];
-    c_string cstr_path = unsafe_copy_as_c_string(make_span_u8(path_buf, OS_LINUX_MAX_PATH_LENGTH), path);
-
-    u32 flags = OS_LINUX_OPEN_FLAG_CREATE | OS_LINUX_OPEN_FLAG_TRUNCATE | OS_LINUX_OPEN_FLAG_WRITE_ONLY;
-    sint n = os_linux_amd64_syscall_open(cstr_path.ptr, flags, 0644);
-    if (n <= 0) {
-        return;
-    }
-    uint fd = cast(uint, n);
-
-    init_log_fd(lg, fd, level);
-}
-
-static bool
-log_buffer_full(Logger *lg) {
-    return lg->pos >= LOG_BUFFER_SIZE;
-}
-
 /*/doc
 
-Returns length (in bytes) of buffer tail (unoccupied portion).
+Create a new named logger with the same sink and level as the given one.
 */
-static uint
-log_buffer_left(Logger *lg) {
-    return LOG_BUFFER_SIZE - lg->pos;
-}
-
-static span_u8
-log_buffer_tail(Logger* lg) {
-    return make_span_u8(lg->buf + lg->pos, log_buffer_left(lg));
-}
-
-static span_u8
-log_buffer_head(Logger* lg) {
-    return make_span_u8(lg->buf, lg->pos);
-}
-
-static void
-log_file_write(Logger* lg, span_u8 s) {
-    if (lg->fd == 0) {
-        return;
-    }
-
-    os_linux_write_all(lg->fd, s);
-}
-
-static void
-log_file_close(Logger* lg) {
-    if (lg->fd == 0) {
-        return;
-    }
-    
-    os_linux_amd64_syscall_close(lg->fd);
-}
-
-static void
-log_flush(Logger* lg) {
-    log_file_write(lg, log_buffer_head(lg));
-    lg->pos = 0;
-}
-
-static void
-log_close(Logger* lg) {
-    log_flush(lg);
-    log_file_close(lg);
-}
-
-static void
-log_put_byte(Logger* lg, u8 b) {
-    if (log_buffer_full(lg)) {
-        log_flush(lg);
-    }
-
-    span_u8 tail = log_buffer_tail(lg);
-    tail.ptr[0] = b;
-    lg->pos += 1;
-}
-
-static void
-log_newline(Logger* lg) {
-    log_put_byte(lg, '\n');
-}
-
-static void
-log_space(Logger* lg) {
-    log_put_byte(lg, ' ');
-}
-
-static void
-log_write(Logger* lg, str s) {
-    if (s.len >= (LOG_BUFFER_SIZE / 2)) {
-        // avoid copies for large strings
-        log_flush(lg);
-        log_file_write(lg, s);
-        return;
-    }
-
-    uint i = 0; // number of bytes from s written
-    while (i < s.len) {
-        if (log_buffer_full(lg)) {
-            log_flush(lg);
-        }
-
-        span_u8 tail = log_buffer_tail(lg);
-        uint n = copy(tail, str_slice_tail(s, i));
-        i += n;
-        lg->pos += n;
-    }
-}
-
-static void
-log_write_field_value_u64(Logger* lg, u64 value) {
-    if (log_buffer_left(lg) < max_u64_dec_length) {
-        log_flush(lg);
-    }
-
-    span_u8 tail = log_buffer_tail(lg);
-    uint n = unsafe_fmt_dec_u64(tail, value);
-    lg->pos += n;
-}
-
-static void
-log_write_field_value_s64(Logger* lg, s64 value) {
-    if (log_buffer_left(lg) < max_s64_dec_length) {
-        log_flush(lg);
-    }
-
-    span_u8 tail = log_buffer_tail(lg);
-    uint n = unsafe_fmt_dec_s64(tail, value);
-    lg->pos += n;
-}
-
-static void
-log_write_field_value_str(Logger* lg, str value) {
-    log_put_byte(lg, '"');
-    log_write(lg, value);
-    log_put_byte(lg, '"');
-}
-
-static void
-log_write_field_value_ptr(Logger* lg, void* ptr) {
-    const uint fmt_ptr_length = 2 + 16; // 0x + hex number
-    if (log_buffer_left(lg) < fmt_ptr_length) {
-        log_flush(lg);
-    }
-
-    span_u8 tail = log_buffer_tail(lg);
-    tail.ptr[0] = '0';
-    tail.ptr[1] = 'x';
-    unsafe_fmt_hex_prefix_zeroes_u64(span_u8_slice_tail(tail, 2), cast(u64, ptr));
-    lg->pos += fmt_ptr_length;
-}
-
-static void
-log_write_field_value_span_s64(Logger* lg, span_s64 value) {
-    log_put_byte(lg, '[');
-    if (value.len == 0) {
-        log_put_byte(lg, ']');
-        return;
-    }
-
-    log_write_field_value_s64(lg, value.ptr[0]);
-    for (uint i = 1; i < value.len; i += 1) {
-        log_put_byte(lg, ',');
-        log_space(lg);
-        log_write_field_value_s64(lg, value.ptr[i]);
-    }
-    log_put_byte(lg, ']');
-}
-
-static void
-log_write_field_value(Logger* lg, u8 kind, LogFieldValue value) {
-    switch (kind) {
-    case LOG_FIELD_U64:
-        log_write_field_value_u64(lg, value.u64);
-        return;
-    case LOG_FIELD_S64:
-        log_write_field_value_s64(lg, value.s64);
-        return;
-    case LOG_FIELD_STR:
-        log_write_field_value_str(lg, value.str);
-        return;
-    case LOG_FIELD_PTR:
-        log_write_field_value_ptr(lg, value.ptr);
-        return;
-    case LOG_FIELD_SPAN_S64:
-        log_write_field_value_span_s64(lg, value.span_s64);
-        return;
-    default:
-        panic_trap();
-    }
-}
-
-static void
-log_write_field(Logger* lg, LogField field) {
-    log_put_byte(lg, '{');
-    log_write(lg, field.name);
-    log_put_byte(lg, ':');
-    log_space(lg);
-    log_write_field_value(lg, field.kind, field.value);
-    log_put_byte(lg, '}');
+static Logger
+log_spawn(Logger *lg, str name) {
+    Logger l = {};
+    l.name = name;
+    l.sink = lg->sink;
+    l.level = lg->level;
+    return l;
 }
 
 static void
@@ -337,9 +387,10 @@ log_message(Logger* lg, u8 level, str s) {
         return;
     }
 
-    log_write(lg, log_prefix_table[level]);
-    log_write(lg, s);
-    log_newline(lg);
+    log_sink_write(lg->sink, log_prefix_table[level]);
+    log_sink_format_logger_name(lg->sink, lg->name);
+    log_sink_write(lg->sink, s);
+    log_sink_put_newline(lg->sink);
 }
 
 static void
@@ -348,11 +399,12 @@ log_message_field(Logger* lg, u8 level, str s, LogField field) {
         return;
     }
 
-    log_write(lg, log_prefix_table[level]);
-    log_write(lg, s);
-    log_space(lg);
-    log_write_field(lg, field);
-    log_newline(lg);
+    log_sink_write(lg->sink, log_prefix_table[level]);
+    log_sink_format_logger_name(lg->sink, lg->name);
+    log_sink_write(lg->sink, s);
+    log_sink_put_space(lg->sink);
+    log_sink_format_field(lg->sink, field);
+    log_sink_put_newline(lg->sink);
 }
 
 static void
