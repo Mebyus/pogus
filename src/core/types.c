@@ -216,6 +216,33 @@ unsafe_reverse_copy(u8* dst, u8* src, uint n) {
 	}
 }
 
+/*/doc
+
+Decode u32 integer from binary big endian encoding.
+Given pointer must contain at least 4 bytes of memory.
+*/
+static u32
+unsafe_get_u32be(u8* p) {
+	u32 r = 0;
+	
+	// most significant byte 4
+	r = p[0];
+
+	// byte 3
+	r <<= 8;
+	r |= p[1];
+
+	// byte 2
+	r <<= 8;
+	r |= p[2];
+
+	// byte 1
+	r <<= 8;
+	r |= p[3];
+	
+	return r;
+}
+
 // Returns number of bytes copied.
 static uint
 copy(span_u8 dst, span_u8 src) {
@@ -419,6 +446,12 @@ fmt_hex_digit(u8 x) {
 		return fmt_dec_digit(x);
 	}
 	return x - 10 + cast(u8, 'A');
+}
+
+static void
+unsafe_fmt_hex_byte(span_u8 buf, u8 x) {
+	buf.ptr[0] = fmt_hex_digit(x >> 4);
+	buf.ptr[1] = fmt_hex_digit(x & 0xF);
 }
 
 const uint max_u64_hex_length = 16;
@@ -645,6 +678,7 @@ unsafe_fmt_buffer_put_str(FormatBuffer* buf, str s) {
 	must(s.len <= tail.len);
 
 	unsafe_copy(tail.ptr, s.ptr, s.len);
+	buf->len += s.len;
 }
 
 static void
@@ -657,6 +691,15 @@ unsafe_fmt_buffer_put_byte(FormatBuffer* buf, u8 b) {
 }
 
 static void
+unsafe_fmt_buffer_put_hex_byte(FormatBuffer* buf, u8 x) {
+	span_u8 tail = fmt_buffer_tail(buf);
+	must(tail.len >= 2);
+
+	unsafe_fmt_hex_byte(tail, x);
+	buf->len += 2;
+}
+
+static void
 unsafe_fmt_buffer_put_newline(FormatBuffer* buf) {
 	unsafe_fmt_buffer_put_byte(buf, '\n');
 }
@@ -664,6 +707,19 @@ unsafe_fmt_buffer_put_newline(FormatBuffer* buf) {
 static void
 unsafe_fmt_buffer_put_space(FormatBuffer* buf) {
 	unsafe_fmt_buffer_put_byte(buf, ' ');
+}
+
+static void
+unsafe_fmt_buffer_put_hex_span_u8(FormatBuffer* buf, span_u8 s) {
+	if (s.len == 0) {
+		return;
+	}
+
+	unsafe_fmt_buffer_put_hex_byte(buf, s.ptr[0]);
+	for (uint i = 1; i < s.len; i += 1) {
+		unsafe_fmt_buffer_put_space(buf);
+		unsafe_fmt_buffer_put_hex_byte(buf, s.ptr[i]);
+	}
 }
 
 static void
