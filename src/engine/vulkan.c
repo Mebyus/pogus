@@ -539,6 +539,39 @@ vulkan_create_vertex_buffer(EngineHarness* h) {
 }
 
 static void
+vulkan_create_swapchain(EngineHarness* h) {
+    vk_SurfaceCapabilitiesKHR surface_capabilities;
+	vk_Result r = vk_get_physical_device_surface_capabilities_khr(h->vk.physical_device, h->vk.surface, &surface_capabilities);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("get surface capabilities"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+
+    u32 image_count = surface_capabilities.min_image_count + 1;
+    if (surface_capabilities.max_image_count != 0 && image_count > surface_capabilities.max_image_count) {
+        image_count = surface_capabilities.max_image_count;
+    }
+    log_info_field(&h->lg, ss("determine number of images for swapchain"), log_field_u64(ss("count"), image_count));
+
+    // Find supported surface formats
+    u32 format_count;
+    vk_get_physical_device_surface_formats_khr(h->vk.physical_device, h->vk.surface, &format_count, nil);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("get supported surface formats count"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+    if (format_count == 0) {
+        log_error(&h->lg, ss("no supported surface formats"));
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+
+    log_info_field(&h->lg, ss("get supported surface formats"), log_field_u64(ss("count"), format_count));
+}
+
+static void
 init_renderer(EngineHarness* h) {
     vulkan_create_instance(h);
     if (h->exit) {
@@ -581,6 +614,11 @@ init_renderer(EngineHarness* h) {
     }
 
     vulkan_create_vertex_buffer(h);
+    if (h->exit) {
+        return;
+    }
+
+    vulkan_create_swapchain(h);
     if (h->exit) {
         return;
     }

@@ -667,6 +667,24 @@ typedef struct {
     u32        offset;
 } vk_VertexInputAttributeDescription;
 
+typedef struct {
+    u32                               min_image_count;
+    u32                               max_image_count;
+    vk_Extent2D                       current_extent;
+    vk_Extent2D                       min_image_extent;
+    vk_Extent2D                       max_image_extent;
+    u32                               max_image_array_layers;
+    u32                               supported_transforms;
+    vk_SurfaceTransformFlagBitsKHR    current_transform;
+    u32                               supported_composite_alpha;
+    u32                               supported_usage_flags;
+} vk_SurfaceCapabilitiesKHR;
+
+typedef struct {
+    vk_Format           format;
+    vk_ColorSpaceKHR    color_space;
+} vk_SurfaceFormatKHR;
+
 vk_Result // linkname
 vkCreateCommandPool(
     vk_Device                                   device,
@@ -775,7 +793,7 @@ vk_command_copy_buffer(
 //     VkImageLayout                               srcImageLayout,
 //     VkImage                                     dstImage,
 //     VkImageLayout                               dstImageLayout,
-//     uint32_t                                    regionCount,
+//     u32                                    regionCount,
 //     const VkImageCopy*                          pRegions);
 
 vk_Result // linkname
@@ -846,4 +864,39 @@ vk_destroy_buffer(
     /* const VkAllocationCallbacks* */ void*     allocator
 ) {
     vkDestroyBuffer(device, buffer, allocator);
+}
+
+vk_Result // linkname
+vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
+    vk_PhysicalDevice                            physical_device,
+    vk_SurfaceKHR                                surface,
+    vk_SurfaceCapabilitiesKHR*                   surface_capabilities
+);
+
+
+static vk_Result
+vk_get_physical_device_surface_capabilities_khr(
+    vk_PhysicalDevice                            physical_device,
+    vk_SurfaceKHR                                surface,
+    vk_SurfaceCapabilitiesKHR*                   surface_capabilities
+) {
+    return vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, surface_capabilities);
+}
+
+vk_Result // linkname
+vkGetPhysicalDeviceSurfaceFormatsKHR(
+    vk_PhysicalDevice                            physical_device,
+    vk_SurfaceKHR                                surface,
+    u32*                                         surface_format_count,
+    vk_SurfaceFormatKHR*                         surface_formats
+);
+
+static vk_Result
+vk_get_physical_device_surface_formats_khr(
+    vk_PhysicalDevice                            physical_device,
+    vk_SurfaceKHR                                surface,
+    u32*                                         surface_format_count,
+    vk_SurfaceFormatKHR*                         surface_formats
+) {
+    return vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, surface_format_count, surface_formats);
 }
