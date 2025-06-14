@@ -7,6 +7,8 @@ log_vulkan_error(Logger *lg, str s, vk_Result r) {
 #define VULKAN_MAX_PHYSICAL_DEVICES      2
 #define VULKAN_MAX_DEVICE_EXTENSIONS     256
 #define VULKAN_MAX_DEVICE_QUEUE_FAMILIES 16
+#define VULKAN_MAX_SURFACE_FORMATS       16
+#define VULKAN_MAX_SURFACE_PRESENT_MODES 16
 
 static void
 vulkan_create_instance(EngineHarness *h) {
@@ -556,7 +558,7 @@ vulkan_create_swapchain(EngineHarness* h) {
 
     // Find supported surface formats
     u32 format_count;
-    vk_get_physical_device_surface_formats_khr(h->vk.physical_device, h->vk.surface, &format_count, nil);
+    r = vk_get_physical_device_surface_formats_khr(h->vk.physical_device, h->vk.surface, &format_count, nil);
     if (r != 0) {
         log_vulkan_error(&h->lg, ss("get supported surface formats count"), r);
         engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
@@ -567,8 +569,51 @@ vulkan_create_swapchain(EngineHarness* h) {
         engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
         return;
     }
-
     log_info_field(&h->lg, ss("get supported surface formats"), log_field_u64(ss("count"), format_count));
+
+    vk_SurfaceFormatKHR surface_formats[VULKAN_MAX_SURFACE_FORMATS];
+    format_count = min_u32(format_count, VULKAN_MAX_SURFACE_FORMATS);
+    r = vk_get_physical_device_surface_formats_khr(h->vk.physical_device, h->vk.surface, &format_count, surface_formats);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("get supported surface formats"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+
+    for (uint i = 0; i < format_count; i += 1) {
+        vk_SurfaceFormatKHR f = surface_formats[i];
+
+        log_debug_field(&h->lg, ss("supported surface format"), log_field_u64(ss("index"), i));
+        log_debug_field(&h->lg, ss("supported surface format"), log_field_u64(ss("format"), f.format));
+        log_debug_field(&h->lg, ss("supported surface format"), log_field_u64(ss("color_space"), f.color_space));
+    }
+
+    u32 present_mode_count;
+    r = vk_get_physical_device_surface_present_modes_khr(h->vk.physical_device, h->vk.surface, &present_mode_count, nil);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("get supported surface present modes count"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+    if (present_mode_count == 0) {
+        log_error(&h->lg, ss("no supported surface present_modes"));
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+    log_info_field(&h->lg, ss("get supported surface present modes"), log_field_u64(ss("count"), present_mode_count));
+
+    vk_PresentModeKHR present_modes[VULKAN_MAX_SURFACE_PRESENT_MODES];
+    present_mode_count = min_u32(present_mode_count, VULKAN_MAX_SURFACE_PRESENT_MODES);
+    r = vk_get_physical_device_surface_present_modes_khr(h->vk.physical_device, h->vk.surface, &present_mode_count, present_modes);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("get supported surface present modes"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+
+    for (uint i = 0; i < present_mode_count; i += 1) {
+        log_debug_field(&h->lg, ss("supported surface present mode"), log_field_u64(ss("mode"), present_modes[i]));
+    }
 }
 
 static void

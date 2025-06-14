@@ -900,3 +900,21 @@ vk_get_physical_device_surface_formats_khr(
 ) {
     return vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, surface_format_count, surface_formats);
 }
+
+vk_Result // linkname
+vkGetPhysicalDeviceSurfacePresentModesKHR(
+    vk_PhysicalDevice                            physical_device,
+    vk_SurfaceKHR                                surface,
+    u32*                                         present_mode_count,
+    vk_PresentModeKHR*                           present_modes
+);
+
+static vk_Result
+vk_get_physical_device_surface_present_modes_khr(
+    vk_PhysicalDevice                            physical_device,
+    vk_SurfaceKHR                                surface,
+    u32*                                         present_mode_count,
+    vk_PresentModeKHR*                           present_modes
+) {
+    return vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, present_mode_count, present_modes);
+}
