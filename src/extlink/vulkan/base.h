@@ -43,6 +43,7 @@ typedef enum {
     VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER = 45,
     VK_STRUCTURE_TYPE_MEMORY_BARRIER = 46,
 
+    VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR = 1000001000,
     VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR = 1000005000,
 } vk_StructureType;
 
@@ -60,6 +61,7 @@ typedef struct vk_ObjectBuffer*          vk_Buffer;
 typedef struct vk_ObjectDeviceMemory*    vk_DeviceMemory;
 typedef struct vk_ObjectFramebuffer*     vk_Framebuffer;  
 typedef struct vk_ObjectRenderPass*      vk_RenderPass;
+typedef struct vk_ObjectImage*           vk_Image;
 /* =================== */
 
 typedef struct {

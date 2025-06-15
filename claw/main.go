@@ -25,15 +25,16 @@ func main() {
 		var buildKind BuildKind
 		var target string
 		if len(os.Args) >= 3 {
-			// if strings.HasPrefix()
-			// switch os.Args[2] {
-			// case "--test":
-			// 	buildKind = BuildTest
-			// case "--release":
-			// 	buildKind = BuildRelease
-			// default:
-			// 	buildKind = BuildDebug
-			// }
+			if len(os.Args) >= 4 && strings.HasPrefix(os.Args[2], "--") {
+				switch os.Args[2] {
+				case "--test":
+					buildKind = BuildTest
+				case "--release":
+					buildKind = BuildRelease
+				default:
+					buildKind = BuildDebug
+				}
+			}
 			target = os.Args[len(os.Args)-1]
 		}
 

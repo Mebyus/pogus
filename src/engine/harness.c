@@ -13,6 +13,10 @@ typedef struct {
     vk_Queue          graphics_queue;
     vk_CommandPool    command_pool;
     vk_SurfaceKHR     surface;
+
+    vk_Extent2D       swapchain_extent;
+    vk_SwapchainKHR   swapchain;
+    vk_SwapchainKHR   old_swapchain;
     // vk_Framebuffer    framebuffer;
 
     vk_Semaphore  image_available_semaphore;

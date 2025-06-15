@@ -540,6 +540,46 @@ vulkan_create_vertex_buffer(EngineHarness* h) {
     h->vk.vertex_attribute_descriptions[1].offset = sizeof(f32) * 3;
 }
 
+static vk_Extent2D
+vulkan_select_swapchain_extent(vk_SurfaceCapabilitiesKHR *c) {
+    return c->current_extent;
+}
+
+static vk_SurfaceFormatKHR
+vulkan_select_surface_format(vk_SurfaceFormatKHR* formats, uint len) {
+    must(len != 0);
+
+    vk_SurfaceFormatKHR ret = {};
+
+    if (len == 1 && formats[0].format == VK_FORMAT_UNDEFINED) {
+        ret.format = VK_FORMAT_R8G8B8A8_UNORM;
+        ret.color_space = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
+        return ret;
+    }
+
+    for (uint i = 0; i < len; i += 1) {
+        vk_SurfaceFormatKHR f = formats[i];
+
+        if (f.format == VK_FORMAT_R8G8B8A8_UNORM) {
+            return f;
+        }
+    }
+
+    return formats[0];
+}
+
+static vk_PresentModeKHR
+vulkan_select_present_mode(vk_PresentModeKHR* modes, uint len) {
+    for (uint i = 0; i < len; i += 1) {
+        if (modes[i] == VK_PRESENT_MODE_FIFO_RELAXED_KHR) {
+            return VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+        }
+    }
+
+    // If mailbox is unavailable, fall back to FIFO (guaranteed to be available)
+    return VK_PRESENT_MODE_FIFO_KHR;
+}
+
 static void
 vulkan_create_swapchain(EngineHarness* h) {
     vk_SurfaceCapabilitiesKHR surface_capabilities;
@@ -549,6 +589,8 @@ vulkan_create_swapchain(EngineHarness* h) {
         engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
         return;
     }
+    log_debug_field(&h->lg, ss("surface current extent"), log_field_u64(ss("width"), surface_capabilities.current_extent.width));
+    log_debug_field(&h->lg, ss("surface current extent"), log_field_u64(ss("height"), surface_capabilities.current_extent.height));
 
     u32 image_count = surface_capabilities.min_image_count + 1;
     if (surface_capabilities.max_image_count != 0 && image_count > surface_capabilities.max_image_count) {
@@ -596,7 +638,7 @@ vulkan_create_swapchain(EngineHarness* h) {
         return;
     }
     if (present_mode_count == 0) {
-        log_error(&h->lg, ss("no supported surface present_modes"));
+        log_error(&h->lg, ss("no supported surface present modes"));
         engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
         return;
     }
@@ -614,6 +656,66 @@ vulkan_create_swapchain(EngineHarness* h) {
     for (uint i = 0; i < present_mode_count; i += 1) {
         log_debug_field(&h->lg, ss("supported surface present mode"), log_field_u64(ss("mode"), present_modes[i]));
     }
+
+    h->vk.swapchain_extent = vulkan_select_swapchain_extent(&surface_capabilities);
+    vk_SurfaceFormatKHR surface_format = vulkan_select_surface_format(surface_formats, format_count);
+    vk_PresentModeKHR present_mode = vulkan_select_present_mode(present_modes, present_mode_count);
+
+    // Determine transformation to use (preferring no transform)
+    vk_SurfaceTransformFlagBitsKHR surface_transform;
+    if ((surface_capabilities.supported_transforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) != 0) {
+        surface_transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    } else {
+        surface_transform = surface_capabilities.current_transform;
+    }
+
+    h->vk.old_swapchain = h->vk.swapchain;
+
+    vk_SwapchainCreateInfoKHR create_info = {};
+    create_info.type = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    create_info.surface = h->vk.surface;
+    create_info.min_image_count = image_count;
+    create_info.image_format = surface_format.format;
+    create_info.image_color_space = surface_format.color_space;
+    create_info.image_extent = h->vk.swapchain_extent;
+    create_info.image_array_layers = 1;
+    create_info.image_usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    create_info.image_sharing_mode = VK_SHARING_MODE_EXCLUSIVE;
+    create_info.queue_family_index_count = 0;
+    create_info.queue_family_indices = nil;
+    create_info.pre_transform = surface_transform;
+    create_info.composite_alpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    create_info.present_mode = present_mode;
+    create_info.clipped = true;
+    create_info.old_swapchain = h->vk.old_swapchain;
+
+    r = vk_create_swapchain_khr(h->vk.device, &create_info, nil, &h->vk.swapchain);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("create new swapchain"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+
+    if (h->vk.old_swapchain != nil) {
+        vk_destroy_swapchain_khr(h->vk.device, h->vk.old_swapchain, nil);
+    }
+
+    // Store the images used by the swap chain
+    // Note: these are the images that swap chain image indices refer to
+    // Note: actual number of images may differ from requested number, since it's a lower bound
+    u32 swapchain_image_count = 0;
+    r = vk_get_swapchain_images_khr(h->vk.device, h->vk.swapchain, &swapchain_image_count, nil);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("get swapchain image count"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+    if (swapchain_image_count == 0) {
+        log_vulkan_error(&h->lg, ss("no swapchain images"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return;
+    }
+    log_debug_field(&h->lg, ss("get swapchain image count"), log_field_u64(ss("count"), swapchain_image_count));
 }
 
 static void
