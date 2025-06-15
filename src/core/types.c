@@ -378,6 +378,23 @@ make_span_str(void* ptr, uint len) {
 }
 
 typedef struct {
+	u64* ptr;
+	uint len;
+} span_u64;
+
+static span_u64
+make_span_u64(u64* ptr, uint len) {
+    span_u64 s = {};
+	if (len == 0) {
+		return s;
+	}
+
+    s.ptr = ptr;
+    s.len = len;
+    return s;
+}
+
+typedef struct {
 	s64* ptr;
 	uint len;
 } span_s64;

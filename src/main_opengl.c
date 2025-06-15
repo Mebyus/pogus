@@ -12,8 +12,10 @@ uint main(uint argc, u8** argv, u8** envp) {
         return code;
     }
     
+    LogSink sink;
     Logger lg;
-    init_log_fd(&lg, OS_LINUX_STDOUT, LOG_LEVEL_DEBUG);
+    init_log_sink_from_fd(&sink, OS_LINUX_STDOUT);
+    init_log(&lg, &sink, LOG_LEVEL_DEBUG);
     log_debug_field(&lg, ss("test writer interface"), log_field_u64(ss("size"), sizeof(BagWriterTab)));
 
     // number of generated integers
@@ -59,6 +61,6 @@ uint main(uint argc, u8** argv, u8** envp) {
     // log_debug_field(&lg, ss("test array size"), log_field_u64(ss("size"), sizeof(array)));
     // log_debug_field(&lg, ss("test array len"), log_field_u64(ss("len"), array_len(array)));
     
-    log_close(&lg);
+    log_sink_close(&sink);
     return 0;
 }
