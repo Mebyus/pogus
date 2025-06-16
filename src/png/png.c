@@ -87,6 +87,45 @@ png_print_chunk_ihdr(span_u8 data) {
     print(fmt_buffer_head(&buf));    
 }
 
+typedef struct {
+    // raw bytes being read
+    span_u8 data;
+
+    // index of next byte to read
+    uint pos;
+
+    // bit buffer
+    u32 buf;
+
+    // number of stored bits inside {buf}
+    u32 n;
+} PngBitStream;
+
+static void
+png_print_chunk_idat(span_u8 data) {
+    if (data.len < 4) {
+        return;
+    }
+
+    u8 method = data.ptr[0];
+    u8 flags = data.ptr[1];
+
+    u8 buf_array[1 << 12];
+    FormatBuffer buf;
+    init_fmt_buffer(&buf, make_span_u8(buf_array, sizeof(buf_array)));
+
+    unsafe_fmt_buffer_put_str(&buf, ss("method: "));
+    unsafe_fmt_buffer_put_bin_byte(&buf, method);
+    unsafe_fmt_buffer_put_newline(&buf);
+    
+    unsafe_fmt_buffer_put_str(&buf, ss("flags: "));
+    unsafe_fmt_buffer_put_bin_byte(&buf, flags);
+    unsafe_fmt_buffer_put_newline(&buf);
+
+    unsafe_fmt_buffer_put_newline(&buf);
+    print(fmt_buffer_head(&buf));
+}
+
 static void
 png_print_chunk(PngChunk chunk) {
     u8 buf_array[1 << 12];
@@ -108,6 +147,7 @@ png_print_chunk(PngChunk chunk) {
         png_print_chunk_ihdr(chunk.data);
         break;
     case PNG_CHUNK_IDAT:
+        png_print_chunk_idat(chunk.data);
         break;
     case PNG_CHUNK_IEND:
         // always has length 0

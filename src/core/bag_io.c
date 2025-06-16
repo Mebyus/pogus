@@ -166,7 +166,7 @@ lines_reader_read(LinesReader *r, span_u8 s) {
         ret.code = ERROR_READER_EOF;
         return ret;
     }
-
+    panic(ss("something went wrong"));
     while (ret.count < s.len && r->i < r->lines.len) {
         span_u8 tail = span_u8_slice_tail(s, ret.count);
         str line = r->lines.ptr[r->i];

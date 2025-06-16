@@ -718,6 +718,36 @@ vulkan_create_swapchain(EngineHarness* h) {
     log_debug_field(&h->lg, ss("get swapchain image count"), log_field_u64(ss("count"), swapchain_image_count));
 }
 
+static vk_ShaderModule
+vulkan_create_shader_module(EngineHarness* h, str path) {
+    MemAllocator al = imake_mem_bump_allocator(&proc_mem_bump_allocator);
+    MemBlob blob;
+    ErrorCode c = os_load_file(al, path, &blob);
+    if (c != 0) {
+        log_error_field(&h->lg, ss("load shader code"), log_field_u64(ss("error"), c));
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return nil;
+    }
+
+    span_u8 data = mem_blob_get_data(blob);
+
+    vk_ShaderModuleCreateInfo create_info = {};
+    create_info.type = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    create_info.code_size = data.len;
+    create_info.code = cast(u32*, data.ptr);
+
+    vk_ShaderModule shader_module;
+    vk_Result r = vk_create_shader_module(h->vk.device, &create_info, nil, &shader_module);
+    if (r != 0) {
+        log_vulkan_error(&h->lg, ss("create shader module"), r);
+        engine_harness_mark_exit(h, ENGINE_EXIT_ERROR_INIT);
+        return nil;
+    }
+
+    log_info_field(&h->lg, ss("create shader module"), log_field_str(ss("path"), path));
+    return shader_module;
+}
+
 static void
 init_renderer(EngineHarness* h) {
     vulkan_create_instance(h);

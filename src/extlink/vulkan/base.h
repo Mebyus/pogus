@@ -32,6 +32,8 @@ typedef enum {
 
     VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO = 12,
 
+    VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO = 16,
+
     VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO = 37,
     VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO = 38,
     VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO = 39,
@@ -62,6 +64,7 @@ typedef struct vk_ObjectDeviceMemory*    vk_DeviceMemory;
 typedef struct vk_ObjectFramebuffer*     vk_Framebuffer;  
 typedef struct vk_ObjectRenderPass*      vk_RenderPass;
 typedef struct vk_ObjectImage*           vk_Image;
+typedef struct vk_ObjectShaderModule*    vk_ShaderModule;
 /* =================== */
 
 typedef struct {

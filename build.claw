@@ -32,6 +32,10 @@
     #root main_png.c
 }
 
+#build kmp {
+    #root main_kmp.c
+}
+
 #build lines {
     #root main_lines.c
 }

@@ -716,6 +716,14 @@ typedef struct {
     vk_ColorSpaceKHR    color_space;
 } vk_SurfaceFormatKHR;
 
+typedef struct {
+    vk_StructureType             type;
+    const void*                  next;
+    u32                          flags;
+    uint                         code_size; // in bytes
+    const u32*                   code; // u32* is used for SPIR-V instructions and their 4-byte alignment
+} vk_ShaderModuleCreateInfo;
+
 vk_Result // linkname
 vkCreateCommandPool(
     vk_Device                                   device,
@@ -904,7 +912,6 @@ vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
     vk_SurfaceCapabilitiesKHR*                   surface_capabilities
 );
 
-
 static vk_Result
 vk_get_physical_device_surface_capabilities_khr(
     vk_PhysicalDevice                            physical_device,
@@ -1002,3 +1009,20 @@ vk_get_swapchain_images_khr(
     return vkGetSwapchainImagesKHR(device, swapchain, swapchain_image_count, swapchain_images);
 }
 
+vk_Result // linkname
+vkCreateShaderModule(
+    vk_Device                                    device,
+    const vk_ShaderModuleCreateInfo*             create_info,
+    /*const VkAllocationCallbacks* */void*       allocator,
+    vk_ShaderModule*                             shader_module
+);
+
+static vk_Result
+vk_create_shader_module(
+    vk_Device                                    device,
+    const vk_ShaderModuleCreateInfo*             create_info,
+    /*const VkAllocationCallbacks* */void*       allocator,
+    vk_ShaderModule*                             shader_module
+) {
+    return vkCreateShaderModule(device, create_info, nil, shader_module);
+}

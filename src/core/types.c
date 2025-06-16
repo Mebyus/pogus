@@ -54,6 +54,13 @@ typedef uint pint;
 // Gives number of elements in non-decayed array.
 #define array_len(a) (sizeof(a) / sizeof(*a))
 
+// Produce error code with kind {k} and value {v}
+#define ERROR_CODE(k, v) ((k << 32) | v)
+
+#define SOURCE_ORIGIN make_source_origin(make_str((u8*)(__FILE__), sizeof(__FILE__) - 1), __LINE__)
+
+#define panic(s) panic_origin(s, SOURCE_ORIGIN)
+
 _Noreturn static void
 panic_trap(void) {
 	__builtin_trap();
@@ -126,6 +133,19 @@ typedef struct {
 	uint len;
 } span_u8, str, c_string;
 
+typedef struct {
+	str  file;
+	uint line;
+} SourceOrigin;
+
+static SourceOrigin
+make_source_origin(str file, uint line) {
+	SourceOrigin s = {};
+	s.file = file;
+	s.line = line;
+	return s;
+}
+
 // Use when you need to explicitly assign empty string.
 static const str
 empty_str = { .ptr = nil, .len = 0 };
@@ -142,8 +162,9 @@ print(str s) {
 }
 
 static void
-panic(str s) {
-	stderr_write(s);
+panic_origin(str s, SourceOrigin o) {
+	stderr_write(s); // TODO: need formatting here
+	stderr_write(o.file);
 	panic_trap();
 }
 
@@ -395,6 +416,24 @@ make_span_u64(u64* ptr, uint len) {
 }
 
 typedef struct {
+	uint* ptr;
+	uint  len;
+} span_uint;
+
+
+static span_uint
+make_span_uint(uint* ptr, uint len) {
+    span_uint s = {};
+	if (len == 0) {
+		return s;
+	}
+
+    s.ptr = ptr;
+    s.len = len;
+    return s;
+}
+
+typedef struct {
 	s64* ptr;
 	uint len;
 } span_s64;
@@ -469,6 +508,16 @@ static void
 unsafe_fmt_hex_byte(span_u8 buf, u8 x) {
 	buf.ptr[0] = fmt_hex_digit(x >> 4);
 	buf.ptr[1] = fmt_hex_digit(x & 0xF);
+}
+
+static void
+unsafe_fmt_bin_byte(span_u8 buf, u8 x) {
+	uint i = 8;
+	while (i != 0) {
+		i -= 1;
+		buf.ptr[i] = fmt_dec_digit(x & 1);
+		x >>= 1;
+	}
 }
 
 const uint max_u64_hex_length = 16;
@@ -714,6 +763,15 @@ unsafe_fmt_buffer_put_hex_byte(FormatBuffer* buf, u8 x) {
 
 	unsafe_fmt_hex_byte(tail, x);
 	buf->len += 2;
+}
+
+static void
+unsafe_fmt_buffer_put_bin_byte(FormatBuffer* buf, u8 x) {
+	span_u8 tail = fmt_buffer_tail(buf);
+	must(tail.len >= 8);
+
+	unsafe_fmt_bin_byte(tail, x);
+	buf->len += 8;
 }
 
 static void
