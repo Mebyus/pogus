@@ -3,6 +3,73 @@ typedef struct {
     bool ok;
 } RetIndex;
 
+static RetIndex
+str_index_byte(str s, u8 x) {
+    RetIndex ret = {};
+    for (uint i = 0; i < s.len; i += 1) {
+        if (s.ptr[i] == x) {
+            ret.index = i;
+            ret.ok = true;
+            return ret;
+        }
+    }
+    return ret;
+}
+
+static RetIndex
+str_index_back_byte(str s, u8 x) {
+    RetIndex ret = {};
+    uint i = s.len;
+    while (i != 0) {
+        i -= 1;
+        if (s.ptr[i] == x) {
+            ret.index = i;
+            ret.ok = true;
+            return ret;
+        }
+    }
+    return ret;
+}
+
+/*/doc
+
+Removes space characters (' ' byte) from both start and end of the string.
+Returned string is either:
+1. empty in case original string contains only spaces or is empty
+2. slice into original string
+*/
+static str
+str_trim_space(str s) {
+    uint i = 0;
+    while (i < s.len && s.ptr[i] == ' ') {
+        i += 1;
+    }
+    str tail = str_slice_tail(s, i);
+
+    i = tail.len;
+    while (i != 0) {
+        i -= 1;
+        if (tail.ptr[i] != ' ') {
+            return str_slice_head(tail, i + 1);
+        }
+    }
+    return empty_str;
+}
+
+/*/doc
+
+Finds first line break and slices string head before it.
+If there is no line break in the string then entire string is returned. 
+*/
+static str
+str_slice_line(str s) {
+    RetIndex r = str_index_byte(s, '\n');
+    if (!r.ok) {
+        return s;
+    }
+    return str_slice_head(s, r.index);
+}
+
 #define SMALL_STRING_PATTERN (1 << 10)
 
 /*/doc
@@ -104,5 +171,83 @@ str_index(str s, str p) {
     }
 
     // TODO: code for patterns that are not small, probably need an allocator here
+    return ret;
+}
+
+typedef struct {
+    str  prefix;
+    uint count;
+    uint weight;
+} RetPrefixRepeat;
+
+/*/doc
+
+Counts how many times {prefix} string repeats (with no overlaps)
+at the beginning of string {s}.
+
+If string {s} does not start with {prefix}, than returned count is 0.
+*/
+static uint
+str_count_prefix_repeats(str s, str prefix) {
+    if (s.len < prefix.len) {
+        return 0;
+    }
+
+    uint count = 0;
+    uint i = 0;
+    while (i < s.len) {
+        if (!str_has_prefix(str_slice_tail(s, i), prefix)) {
+            return count;
+        }
+
+        i += prefix.len;
+        count += 1;
+    }
+    return count;
+}
+
+static RetPrefixRepeat
+str_find_optimal_prefix_repeats(str s) {
+    RetPrefixRepeat ret = {};
+    if (s.len == 0) {
+        return ret;
+    }
+
+    // first we check repeats of one leading byte by a simple loop
+    uint i = 1;
+    while (i < s.len) {
+        if (s.ptr[i] == s.ptr[0]) {
+            i += 1;
+        } else {
+            break;
+        }
+    }
+
+    // best total length of prefix repeats = prefix.len * count
+    uint best_count = i;
+    uint best_total_len = i;
+    uint best_prefix_len = 1;
+    uint best_weight = best_total_len - best_prefix_len;
+
+    // current prefix length
+    uint len = 2;
+    while (len <= (s.len >> 1)) {
+        uint count = 1 + str_count_prefix_repeats(str_slice_tail(s, len), str_slice_head(s, len));
+        uint total_len = len * count;
+        uint weight = total_len - len;
+
+        if (count > 1 && weight > best_weight) {
+            best_total_len = total_len;
+            best_count = count;
+            best_prefix_len = len;
+            best_weight = weight;
+        }
+
+        len += 1;
+    }
+
+    ret.prefix = str_slice_head(s, best_prefix_len);
+    ret.count = best_count;
+    ret.weight = best_weight;
     return ret;
 }

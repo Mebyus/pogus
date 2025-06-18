@@ -1,19 +1,19 @@
 // Unsigned integers of fixed size.
-typedef unsigned char u8;
+typedef unsigned char      u8;
 typedef unsigned short int u16;
-typedef unsigned int u32;
-typedef unsigned long int u64;
-typedef __uint128_t u128;
+typedef unsigned int       u32;
+typedef unsigned long int  u64;
+typedef __uint128_t        u128;
 
 // Signed integers of fixed size.
-typedef signed char s8;
+typedef signed char      s8;
 typedef signed short int s16;
-typedef signed int s32;
-typedef signed long int s64;
-typedef __int128_t s128;
+typedef signed int       s32;
+typedef signed long int  s64;
+typedef __int128_t       s128;
 
-typedef float f32;
-typedef double f64;
+typedef float      f32;
+typedef double     f64;
 typedef __float128 f128;
 
 // No longer needed in C23
@@ -77,15 +77,15 @@ must(bool c) {
 	panic_trap();
 }
 
-const u8  max_integer_u8  = 0xFF;
-const u16 max_integer_u16 = 0xFFFF;
-const u32 max_integer_u32 = 0xFFFFFFFF;
-const u64 max_integer_u64 = 0xFFFFFFFFFFFFFFFF;
+static const u8  max_integer_u8  = 0xFF;
+static const u16 max_integer_u16 = 0xFFFF;
+static const u32 max_integer_u32 = 0xFFFFFFFF;
+static const u64 max_integer_u64 = 0xFFFFFFFFFFFFFFFF;
 
-const s8  max_integer_s8  = 0x7F;
-const s16 max_integer_s16 = 0x7FFF;
-const s32 max_integer_s32 = 0x7FFFFFFF;
-const s64 max_integer_s64 = 0x7FFFFFFFFFFFFFFF;
+static const s8  max_integer_s8  = 0x7F;
+static const s16 max_integer_s16 = 0x7FFF;
+static const s32 max_integer_s32 = 0x7FFFFFFF;
+static const s64 max_integer_s64 = 0x7FFFFFFFFFFFFFFF;
 
 static u32
 min_u32(u32 a, u32 b) {
@@ -198,6 +198,13 @@ span_u8_slice_tail(span_u8 s, uint n) {
 }
 
 static str
+str_slice(str s, uint i, uint j) {
+	must(i <= j);
+	must(j <= s.len);
+	return make_span_u8(s.ptr + i, j - i);
+}
+
+static str
 str_slice_head(str s, uint n) {
 	return span_u8_slice_head(s, n);
 }
@@ -278,6 +285,13 @@ copy(span_u8 dst, span_u8 src) {
 
     unsafe_copy(dst.ptr, src.ptr, n);
 	return n;
+}
+
+static void
+clear(span_u8 s) {
+	for (uint i = 0; i < s.len; i += 1) {
+		s.ptr[i] = 0;
+	}
 }
 
 static uint
@@ -724,6 +738,11 @@ init_fmt_buffer(FormatBuffer* buf, span_u8 s) {
 	buf->cap = s.len;
 }
 
+static void
+fmt_buffer_reset(FormatBuffer* buf) {
+	buf->len = 0;
+}
+
 static str
 fmt_buffer_head(FormatBuffer* buf) {
 	return make_str(buf->ptr, buf->len);
@@ -757,6 +776,17 @@ unsafe_fmt_buffer_put_byte(FormatBuffer* buf, u8 b) {
 }
 
 static void
+unsafe_fmt_buffer_put_byte_repeat(FormatBuffer* buf, u8 b, uint n) {
+	span_u8 tail = fmt_buffer_tail(buf);
+	must(tail.len >= n);
+
+	for (uint i = 0; i < n; i += 1) {
+		tail.ptr[i] = b;
+	}
+	buf->len += n;
+}
+
+static void
 unsafe_fmt_buffer_put_hex_byte(FormatBuffer* buf, u8 x) {
 	span_u8 tail = fmt_buffer_tail(buf);
 	must(tail.len >= 2);
@@ -785,6 +815,11 @@ unsafe_fmt_buffer_put_space(FormatBuffer* buf) {
 }
 
 static void
+unsafe_fmt_buffer_put_space_repeat(FormatBuffer* buf, uint n) {
+	unsafe_fmt_buffer_put_byte_repeat(buf, ' ', n);
+}
+
+static void
 unsafe_fmt_buffer_put_hex_span_u8(FormatBuffer* buf, span_u8 s) {
 	if (s.len == 0) {
 		return;
@@ -801,6 +836,19 @@ static void
 unsafe_fmt_buffer_put_dec_u64(FormatBuffer* buf, u64 x) {
 	const uint n = unsafe_fmt_dec_u64(fmt_buffer_tail(buf), x);
 	buf->len += n;
+}
+
+static void
+unsafe_fmt_buffer_put_dec_span_uint(FormatBuffer* buf, span_uint s) {
+	if (s.len == 0) {
+		return;
+	}
+
+	unsafe_fmt_buffer_put_dec_u64(buf, s.ptr[0]);
+	for (uint i = 1; i < s.len; i += 1) {
+		unsafe_fmt_buffer_put_space(buf);
+		unsafe_fmt_buffer_put_dec_u64(buf, s.ptr[i]);
+	}
 }
 
 static void

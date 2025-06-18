@@ -1,0 +1,4 @@
+PUT_LIT     "hello"
+PUT_REF     (0, 3)
+PUT_LIT     " world"
+PUT_REF     (2, 5)
