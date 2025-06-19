@@ -88,6 +88,7 @@ init_renderer(EngineHarness* h);
 static void
 init_engine_harness(EngineHarness* h) {
     engine_harness_create_log(h);
+    log_debug(&h->lg, ss("start"));
 
     engine_harness_create_window(h);
     if (h->exit) {

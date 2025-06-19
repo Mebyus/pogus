@@ -1,3 +1,15 @@
+static u64
+amd64_rdtsc() {
+    u64 low, high;
+    __asm__ volatile ("rdtsc" : "=a" (low), "=d" (high));
+    return (high << 32) | low;
+}
+
+static u64
+cpu_clock() {
+    return amd64_rdtsc();
+}
+
 #define OS_LINUX_ERROR_CODE_NOT_EXIST 2
 
 #define OS_LINUX_AMD64_SYSCALL_READ 0

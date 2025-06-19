@@ -1,8 +1,5 @@
 #include "core/include.h"
 
-#include "link_libc.h"
-#include "os_linux_log.c"
-
 #include "engine/include.h"
 
 static void

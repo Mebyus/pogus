@@ -18,6 +18,9 @@ Related:
 typedef struct {
     u8 buf[LOG_BUFFER_SIZE];
 
+    // Value returned by clock when sink was initialized.
+    TimeDur start;
+
     // Write position for buffer. Corresponds to number of bytes
     // currently stored in buffer.
     uint pos;
@@ -35,6 +38,7 @@ static void
 init_log_sink_from_fd(LogSink* sink, uint fd) {
     sink->fd = fd;
     sink->pos = 0;
+    sink->start = clock_mono();
 }
 
 static void
@@ -42,11 +46,9 @@ init_log_sink(LogSink* sink, str path) {
     static_assert(LOG_BUFFER_SIZE >= 1024);
     must(path.len != 0);
 
-    // This init is needed to setup discard logger when
-    // opening a file fails
-    init_log_sink_from_fd(sink, 0);
     RetOpen ret = os_create(path);
     if (ret.code != 0) {
+        init_log_sink_from_fd(sink, 0);
         return;
     }
 
@@ -192,6 +194,15 @@ log_sink_format_dec_u64(LogSink* sink, u64 x) {
 }
 
 static void
+log_sink_format_clock(LogSink* sink) {
+    TimeDur sub = time_dur_sub(clock_mono(), sink->start);
+    log_sink_format_dec_u64(sink, cast(u64, sub.sec));
+    log_sink_put_byte(sink, '.');
+    log_sink_format_dec_u64(sink, cast(u64, sub.nsec));
+    log_sink_put_space(sink);
+}
+
+static void
 log_sink_format_dec_s64(LogSink* sink, s64 x) {
     log_sink_threshold_flush(sink, max_s64_dec_length);
 
@@ -260,6 +271,23 @@ typedef struct {
     u8  kind;
 } LogField;
 
+typedef struct {
+    LogField* ptr;
+    uint len;
+} SpanLogField;
+
+static SpanLogField
+make_span_log_field(LogField* ptr, uint len) {
+    SpanLogField s = {};
+    if (len == 0) {
+        return s;
+    }
+
+    s.ptr = ptr;
+    s.len = len;
+    return s;
+}
+
 static void
 log_sink_format_field_value(LogSink* sink, u8 kind, LogFieldValue value) {
     switch (kind) {
@@ -285,11 +313,30 @@ log_sink_format_field_value(LogSink* sink, u8 kind, LogFieldValue value) {
 
 static void
 log_sink_format_field(LogSink* sink, LogField field) {
-    log_sink_put_byte(sink, '{');
     log_sink_write(sink, field.name);
     log_sink_put_byte(sink, ':');
     log_sink_put_space(sink);
     log_sink_format_field_value(sink, field.kind, field.value);
+}
+
+static void
+log_sink_format_message_field(LogSink* sink, LogField field) {
+    log_sink_put_byte(sink, '{');
+    log_sink_format_field(sink, field);
+    log_sink_put_byte(sink, '}');
+}
+
+static void
+log_sink_format_message_fields(LogSink* sink, SpanLogField fields) {
+    must(fields.len != 0);
+
+    log_sink_put_byte(sink, '{');
+    log_sink_format_field(sink, fields.ptr[0]);
+    for (uint i = 1; i < fields.len; i += 1) {
+        log_sink_put_byte(sink, ',');
+        log_sink_put_space(sink);
+        log_sink_format_field(sink, fields.ptr[i]);
+    }
     log_sink_put_byte(sink, '}');
 }
 
@@ -387,6 +434,7 @@ log_message(Logger* lg, u8 level, str s) {
         return;
     }
 
+    log_sink_format_clock(lg->sink);
     log_sink_write(lg->sink, log_prefix_table[level]);
     log_sink_format_logger_name(lg->sink, lg->name);
     log_sink_write(lg->sink, s);
@@ -399,11 +447,46 @@ log_message_field(Logger* lg, u8 level, str s, LogField field) {
         return;
     }
 
+    log_sink_format_clock(lg->sink);
     log_sink_write(lg->sink, log_prefix_table[level]);
     log_sink_format_logger_name(lg->sink, lg->name);
     log_sink_write(lg->sink, s);
     log_sink_put_space(lg->sink);
-    log_sink_format_field(lg->sink, field);
+    log_sink_format_message_field(lg->sink, field);
+    log_sink_put_newline(lg->sink);
+}
+
+static void
+log_message_field2(Logger* lg, u8 level, str s, LogField field1, LogField field2) {
+    if (level > lg->level) {
+        return;
+    }
+
+    LogField fields[2] = { field1, field2 };
+
+    log_sink_format_clock(lg->sink);
+    log_sink_write(lg->sink, log_prefix_table[level]);
+    log_sink_format_logger_name(lg->sink, lg->name);
+    log_sink_write(lg->sink, s);
+    log_sink_put_space(lg->sink);
+    log_sink_format_message_fields(lg->sink, make_span_log_field(fields, 2));
+    log_sink_put_newline(lg->sink);
+}
+
+static void
+log_message_field3(Logger* lg, u8 level, str s, LogField field1, LogField field2, LogField field3) {
+    if (level > lg->level) {
+        return;
+    }
+
+    LogField fields[3] = { field1, field2, field3 };
+
+    log_sink_format_clock(lg->sink);
+    log_sink_write(lg->sink, log_prefix_table[level]);
+    log_sink_format_logger_name(lg->sink, lg->name);
+    log_sink_write(lg->sink, s);
+    log_sink_put_space(lg->sink);
+    log_sink_format_message_fields(lg->sink, make_span_log_field(fields, 3));
     log_sink_put_newline(lg->sink);
 }
 
@@ -433,6 +516,11 @@ log_debug_field(Logger* lg, str s, LogField field) {
 }
 
 static void
+log_debug_field2(Logger* lg, str s, LogField field1, LogField field2) {
+    log_message_field2(lg, LOG_LEVEL_DEBUG, s, field1, field2);
+}
+
+static void
 log_info_field(Logger* lg, str s, LogField field) {
     log_message_field(lg, LOG_LEVEL_INFO, s, field);
 }
@@ -446,3 +534,14 @@ static void
 log_error_field(Logger* lg, str s, LogField field) {
     log_message_field(lg, LOG_LEVEL_ERROR, s, field);
 }
+
+static void
+log_error_field2(Logger* lg, str s, LogField field1, LogField field2) {
+    log_message_field2(lg, LOG_LEVEL_ERROR, s, field1, field2);
+}
+
+static void
+log_error_field3(Logger* lg, str s, LogField field1, LogField field2, LogField field3) {
+    log_message_field3(lg, LOG_LEVEL_ERROR, s, field1, field2, field3);
+}
+

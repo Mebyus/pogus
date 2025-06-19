@@ -434,7 +434,6 @@ typedef struct {
 	uint  len;
 } span_uint;
 
-
 static span_uint
 make_span_uint(uint* ptr, uint len) {
     span_uint s = {};
@@ -504,6 +503,35 @@ rotate_left_u64(u64 x, uint k) {
     return (x << k) | (x >> (64 - k));
 }
 
+/*/doc
+
+Represents time duration of something with nanosecond precision.
+Both positive and negative durations are possible.
+*/
+typedef struct {
+	// Number of seconds.
+	s64 sec;
+
+	// Number of nanoseconds.
+	s64 nsec;
+} TimeDur;
+
+/*/doc
+
+Subtract two time durations from one another.
+Returns equivalent of {a - b} operation.
+*/
+static TimeDur
+time_dur_sub(TimeDur a, TimeDur b) {
+	TimeDur sub;
+	sub.sec = a.sec - b.sec;
+	sub.nsec = a.nsec - b.nsec;
+  	if (sub.nsec < 0) {
+		sub.sec -= 1;
+		sub.nsec += 1000000000; // number of nanoseconds in one second
+	}
+	return sub;
+}
 
 static u8
 fmt_dec_digit(u8 x) {
