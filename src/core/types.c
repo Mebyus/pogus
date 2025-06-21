@@ -679,6 +679,31 @@ unsafe_fmt_dec_u64(span_u8 buf, u64 x) {
 	return n;
 }
 
+static void
+unsafe_fmt_reverse_dec_fixed_width_u64(u8* ptr, u64 x, uint w) {
+	uint i = 0;
+	while (i < w) {
+		const u8 n = cast(u8, x % 10);
+		x /= 10;
+		ptr[i] = fmt_dec_digit(n);
+		i += 1;
+	}
+}
+
+/*/doc
+
+Formats integer as decimal number with fixed number of digits.
+If number has not enough digits to fill the whole width than
+zeroes are prefixed. If number has more digits then specified width
+than only least significant ones will be written.
+*/
+static void
+unsafe_fmt_dec_fixed_width_u64(span_u8 buf, u64 x, uint w) {
+	u8 digits[max_u64_dec_length];
+	unsafe_fmt_reverse_dec_fixed_width_u64(digits, x, w);
+	unsafe_reverse_copy(buf.ptr, digits, w);
+}
+
 /*/doc
 
 Maximum number of bytes (digits) needed to format any u64 integer as decimal number.
@@ -741,6 +766,27 @@ fmt_dec_s64(span_u8 buf, s64 x) {
 	}
 	buf.ptr[0] = '-';
 	return n + 1;
+}
+
+static const uint
+max_time_dur_micro_length = max_s64_dec_length + 1 + 6;
+
+/*/doc
+
+Formats time duration like this: 17.053793 (with microsecond precision).
+Returns number of bytes actually written.
+*/
+static uint
+unsafe_fmt_time_dur_micro(span_u8 buf, TimeDur t) {
+	// TODO: maybe we should support negative durations as well
+	uint n = unsafe_fmt_dec_u64(buf, cast(u64, t.sec));
+	
+	buf.ptr[n] = '.';
+	n += 1;
+	
+	span_u8 tail = span_u8_slice_tail(buf, n);
+	unsafe_fmt_dec_fixed_width_u64(tail, cast(u64, t.nsec) / 1000, 6);
+	return n + 6;
 }
 
 typedef struct {

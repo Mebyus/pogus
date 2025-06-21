@@ -41,7 +41,10 @@ typedef struct {
 
 typedef struct {
     // Holds the underlying type instance.
-    void* ptr;
+    //
+    // It is either an integer that firts into uint type or
+    // pointer to the object instance.
+    uint obj;
 
     const BagReaderTab* tab;
 } Reader;
@@ -57,7 +60,7 @@ typedef struct {
 
 typedef struct {
     // Holds the underlying type instance.
-    void* ptr;
+    uint obj;
 
     const BagWriterTab* tab;
 } Writer;
@@ -90,7 +93,7 @@ bag_copy(Writer writer, Reader reader) {
     u8 array_buf[1 << 14];
     span_u8 buf = make_span_u8(array_buf, array_len(array_buf));
     while (true) {
-        RetRead r = reader.tab->read(reader.ptr, buf);
+        RetRead r = reader.tab->read(cast(void*, reader.obj), buf);
         if (r.code != 0) {
             if (r.code != ERROR_READER_EOF) {
                 ret.code = r.code;
@@ -104,7 +107,7 @@ bag_copy(Writer writer, Reader reader) {
             continue;
         }
 
-        RetWrite w = writer.tab->write(writer.ptr, span_u8_slice_head(buf, r.count));
+        RetWrite w = writer.tab->write(cast(void*, writer.obj), span_u8_slice_head(buf, r.count));
         ret.count += w.count;
         if (w.code != 0) {
             ret.code = w.code;
@@ -132,7 +135,7 @@ bag_cap_buffer(CapBuffer* buf) {
     must(buf != nil);
 
     Writer w = {};
-    w.ptr = buf;
+    w.obj = cast(uint, buf);
     w.tab = &cap_buffer_bag_writer_tab;
     return w;
 }
@@ -197,7 +200,7 @@ bag_lines_reader(LinesReader* lr) {
     must(lr != nil);
 
     Reader r = {};
-    r.ptr = lr;
+    r.obj = cast(uint, lr);
     r.tab = &lines_reader_reader_tab;
     return r;
 }

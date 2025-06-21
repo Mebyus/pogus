@@ -750,11 +750,13 @@ vulkan_create_shader_module(EngineHarness* h, str path) {
 
 static void
 init_renderer(EngineHarness* h) {
+    log_debug(&h->lg, ss("init vulkan renderer"));
     vulkan_create_instance(h);
     if (h->exit) {
         return;
     }
 
+    log_debug(&h->lg, ss("select physical device"));
     vulkan_select_physical_device(h);
     if (h->exit) {
         return;

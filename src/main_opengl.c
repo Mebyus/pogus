@@ -1,6 +1,5 @@
 #include "core/include.h"
 
-#include "os_linux_log.c"
 #include "rand.c"
 #include "sort.c"
 #include "strconv.c"

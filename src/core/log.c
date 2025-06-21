@@ -196,9 +196,12 @@ log_sink_format_dec_u64(LogSink* sink, u64 x) {
 static void
 log_sink_format_clock(LogSink* sink) {
     TimeDur sub = time_dur_sub(clock_mono(), sink->start);
-    log_sink_format_dec_u64(sink, cast(u64, sub.sec));
-    log_sink_put_byte(sink, '.');
-    log_sink_format_dec_u64(sink, cast(u64, sub.nsec));
+
+    log_sink_threshold_flush(sink, max_time_dur_micro_length);
+    span_u8 tail = log_sink_buffer_tail(sink);
+    uint n = unsafe_fmt_time_dur_micro(tail, sub);
+    sink->pos += n;
+
     log_sink_put_space(sink);
 }
 
@@ -491,6 +494,21 @@ log_message_field3(Logger* lg, u8 level, str s, LogField field1, LogField field2
 }
 
 static void
+log_message_fields(Logger* lg, u8 level, str s, SpanLogField fields) {
+    if (level > lg->level) {
+        return;
+    }
+
+    log_sink_format_clock(lg->sink);
+    log_sink_write(lg->sink, log_prefix_table[level]);
+    log_sink_format_logger_name(lg->sink, lg->name);
+    log_sink_write(lg->sink, s);
+    log_sink_put_space(lg->sink);
+    log_sink_format_message_fields(lg->sink, fields);
+    log_sink_put_newline(lg->sink);
+}
+
+static void
 log_debug(Logger* lg, str s) {
     log_message(lg, LOG_LEVEL_DEBUG, s);
 }
@@ -521,13 +539,28 @@ log_debug_field2(Logger* lg, str s, LogField field1, LogField field2) {
 }
 
 static void
+log_debug_fields(Logger* lg, str s, SpanLogField fields) {
+    log_message_fields(lg, LOG_LEVEL_DEBUG, s, fields);
+}
+
+static void
 log_info_field(Logger* lg, str s, LogField field) {
     log_message_field(lg, LOG_LEVEL_INFO, s, field);
 }
 
 static void
+log_info_fields(Logger* lg, str s, SpanLogField fields) {
+    log_message_fields(lg, LOG_LEVEL_INFO, s, fields);
+}
+
+static void
 log_warn_field(Logger* lg, str s, LogField field) {
     log_message_field(lg, LOG_LEVEL_WARN, s, field);
+}
+
+static void
+log_warn_fields(Logger* lg, str s, SpanLogField fields) {
+    log_message_fields(lg, LOG_LEVEL_WARN, s, fields);
 }
 
 static void
@@ -545,3 +578,7 @@ log_error_field3(Logger* lg, str s, LogField field1, LogField field2, LogField f
     log_message_field3(lg, LOG_LEVEL_ERROR, s, field1, field2, field3);
 }
 
+static void
+log_error_fields(Logger* lg, str s, SpanLogField fields) {
+    log_message_fields(lg, LOG_LEVEL_ERROR, s, fields);
+}

@@ -563,7 +563,7 @@ const BagReaderTab bag_fd_reader_tab = {
 static Reader
 bag_fd_reader(uint fd) {
     Reader r = {};
-    r.ptr = cast(void*, fd); // TODO: maybe we should change void* in bag to just uint and name it "val"
+    r.obj = fd;
     r.tab = &bag_fd_reader_tab;
     return r;    
 }
@@ -576,7 +576,7 @@ const BagWriterTab bag_fd_writer_tab = {
 static Writer
 bag_fd_writer(uint fd) {
     Writer w = {};
-    w.ptr = cast(void*, fd);
+    w.obj = fd;
     w.tab = &bag_fd_writer_tab;
     return w;    
 }
